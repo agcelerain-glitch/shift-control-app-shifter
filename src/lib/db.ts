@@ -320,6 +320,12 @@ export async function updateMemberLineId(memberId: string, lineUserId: string): 
   }, { merge: true });
 }
 
+// admin用: メンバー削除
+export async function deleteMember(memberId: string): Promise<void> {
+  if (!isFirebaseConfigured || !db) return;
+  await deleteDoc(doc(db!, 'members', memberId));
+}
+
 // config/lineConfig: LINEグループIDの購読・削除
 export function subscribeLineConfig(cb: (data: { groupId?: string } | null) => void): () => void {
   if (!isFirebaseConfigured || !db) { cb(null); return () => {}; }

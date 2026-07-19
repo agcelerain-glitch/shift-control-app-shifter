@@ -8,12 +8,12 @@ import { useAuth } from '../contexts/AuthContext';
 import { Card, Button, Badge, Input, Select, Modal, EmptyState } from '../components/ui';
 import {
   CheckCircle2, XCircle, Sliders, RotateCcw, Users, MessageCircle, MapPin, Clock, User as UserIcon,
-  CalendarDays, Hash, ChevronDown, ChevronRight, History,
+  CalendarDays, Hash, ChevronDown, ChevronRight, History, Trash2,
 } from 'lucide-react';
 import { formatDateJP, formatDateTimeJP, isPast7Days, weekdayJP, todayStr } from '../lib/utils';
 import { TEMPLATE_LABELS } from '../lib/types';
 import type { Shift, ApprovalLog } from '../lib/types';
-import { approveShift, restoreShift, updateMemberLineId } from '../lib/db';
+import { approveShift, restoreShift, updateMemberLineId, deleteMember } from '../lib/db';
 
 type SortKey = 'place' | 'time' | 'name' | 'weekday' | 'headcount';
 
@@ -46,6 +46,8 @@ export function AdminShiftPage() {
   const [logOpen, setLogOpen] = useState(false);
   const [lineIdDraft, setLineIdDraft] = useState('');
   const [savingLineId, setSavingLineId] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [deletingMember, setDeletingMember] = useState(false);
 
   // 調整モーダルのフィールド
   const [adjTimeStart, setAdjTimeStart] = useState('');
@@ -136,6 +138,21 @@ export function AdminShiftPage() {
 
   const memberShifts = selectedMember ? shifts.filter((s) => s.memberName === selectedMember) : [];
   const memberInfo = members.find((m) => m.name === selectedMember);
+
+  const handleDeleteMember = async () => {
+    if (!memberInfo) return;
+    setDeletingMember(true);
+    try {
+      await deleteMember(memberInfo.id);
+      toast.show(`${selectedMember}さんを名簿から削除しました`, 'success');
+      setSelectedMember(null);
+      setShowDeleteConfirm(false);
+    } catch (e) {
+      toast.show(`削除失敗: ${(e as Error).message}`, 'error');
+    } finally {
+      setDeletingMember(false);
+    }
+  };
 
   const handleSaveLineId = async () => {
     if (!memberInfo) return;
@@ -302,7 +319,7 @@ export function AdminShiftPage() {
               members.map((m) => (
                 <button
                   key={m.id}
-                  onClick={() => { setSelectedMember(m.name); setLineIdDraft(m.lineUserId ?? ''); }}
+                  onClick={() => { setSelectedMember(m.name); setLineIdDraft(m.lineUserId ?? ''); setShowDeleteConfirm(false); }}
                   className="w-full flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 transition group"
                 >
                   <div className="flex items-center gap-2">
@@ -352,6 +369,33 @@ export function AdminShiftPage() {
                 {memberInfo?.lineUserId ?? '未登録（LINEで「名前登録 お名前」と送信）'}
               </p>
             </div>
+
+            {/* 削除（2段階確認） */}
+            {!showDeleteConfirm ? (
+              <div className="flex justify-end">
+                <Button size="sm" variant="danger" onClick={() => setShowDeleteConfirm(true)}>
+                  <Trash2 className="w-3.5 h-3.5" />メンバー削除
+                </Button>
+              </div>
+            ) : (
+              <div className="rounded-lg border border-red-200 bg-red-50 p-3">
+                <p className="text-sm font-semibold text-red-700 mb-1">
+                  「{selectedMember}」を名簿から削除しますか？
+                </p>
+                <p className="text-xs text-red-500 mb-3">
+                  削除するとLINE ID紐づけが解除されます。シフト申請データは残ります。この操作は取り消せません。
+                </p>
+                <div className="flex gap-2 justify-end">
+                  <Button size="sm" variant="ghost" onClick={() => setShowDeleteConfirm(false)}>
+                    キャンセル
+                  </Button>
+                  <Button size="sm" variant="danger" onClick={handleDeleteMember} disabled={deletingMember}>
+                    <Trash2 className="w-3.5 h-3.5" />
+                    {deletingMember ? '削除中…' : '本当に削除する'}
+                  </Button>
+                </div>
+              </div>
+            )}
             <p className="text-xs font-medium text-gray-600 mb-2">申請履歴</p>
             <div className="space-y-1.5 max-h-60 overflow-y-auto">
               {memberShifts.length === 0 ? (

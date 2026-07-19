@@ -3,17 +3,19 @@
 import { useState } from 'react';
 import { AdminLayout } from '../components/AdminLayout';
 import { useData } from '../contexts/DataContext';
+import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { Card, Button, Input, Textarea, Select, Badge, EmptyState, Tabs } from '../components/ui';
 import { Megaphone, Lock, Trash2, Plus, Bell, FileText } from 'lucide-react';
 import { createBoardPublic, deleteBoardPublic, createBoardPrivate, deleteBoardPrivate } from '../lib/db';
 import { formatDateTimeJP } from '../lib/utils';
 
-const ADMIN_NAME = '管理者';
 type Tab = 'public' | 'private';
 
 export function AdminBoardPage() {
   const { boardPublic, boardPrivate } = useData();
+  const { name } = useAuth();
+  const adminName = name ?? '管理者';
   const toast = useToast();
   const [tab, setTab] = useState<Tab>('public');
 
@@ -27,7 +29,7 @@ export function AdminBoardPage() {
   const submitPublic = async () => {
     if (!pTitle.trim() || !pBody.trim()) { toast.show('タイトル・本文を入力してください', 'error'); return; }
     try {
-      await createBoardPublic(pTitle.trim(), pBody.trim(), ADMIN_NAME);
+      await createBoardPublic(pTitle.trim(), pBody.trim(), adminName);
       toast.show('全体掲示板に投稿しました', 'success');
       setPTitle(''); setPBody('');
     } catch { toast.show('投稿に失敗しました', 'error'); }
@@ -36,7 +38,7 @@ export function AdminBoardPage() {
   const submitPrivate = async () => {
     if (!prBody.trim()) { toast.show('本文を入力してください', 'error'); return; }
     try {
-      await createBoardPrivate(prBody.trim(), prType, ADMIN_NAME);
+      await createBoardPrivate(prBody.trim(), prType, adminName);
       toast.show(prType === 'memo' ? 'メモを保存しました' : '通知を記録しました', 'success');
       setPrBody('');
     } catch { toast.show('保存に失敗しました', 'error'); }

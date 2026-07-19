@@ -7,8 +7,9 @@ import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { Button, Input } from '../components/ui';
 
+
 export function NameSetupPage() {
-  const { setName, name } = useAuth();
+  const { setName, name, role } = useAuth();
   const toast = useToast();
   const navigate = useNavigate();
   const [value, setValue] = useState(name ?? '');
@@ -22,7 +23,7 @@ export function NameSetupPage() {
     }
     setName(trimmed);
     toast.show(`${trimmed} さん、ようこそ`, 'success');
-    navigate('/');
+    navigate(role === 'admin' ? '/admin-shift' : '/');
   };
 
   return (

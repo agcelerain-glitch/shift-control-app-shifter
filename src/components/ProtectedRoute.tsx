@@ -23,8 +23,8 @@ export function RequireRole({ role, children }: { role: Role; children: ReactNod
   if (current !== role) {
     return <Navigate to={current === 'admin' ? '/admin-shift' : '/'} replace />;
   }
-  // userは名前入力が必要
-  if (role === 'user' && !name) {
+  // user/admin ともに名前入力が必要
+  if (!name) {
     return <Navigate to="/name-setup" replace />;
   }
   return <>{children}</>;

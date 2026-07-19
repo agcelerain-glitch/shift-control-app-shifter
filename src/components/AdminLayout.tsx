@@ -13,7 +13,7 @@ const navItems = [
 ];
 
 export function AdminLayout({ children }: { children: ReactNode }) {
-  const { signOut } = useAuth();
+  const { signOut, name } = useAuth();
   const navigate = useNavigate();
 
   const handleSignOut = async () => {
@@ -30,7 +30,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
               <ShieldCheck className="w-5 h-5" />
             </div>
             <span className="font-semibold">シフト管理 — 管理者</span>
-            <span className="text-xs text-slate-300 bg-slate-800 px-2 py-0.5 rounded-full">admin</span>
+            {name && <span className="text-xs text-slate-300 bg-slate-700 px-2 py-0.5 rounded-full">{name}</span>}
           </div>
           <button onClick={handleSignOut} className="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800" title="ログアウト">
             <LogOut className="w-4 h-4" />

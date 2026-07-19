@@ -1,4 +1,4 @@
-// /request シフト申請: 不可（週単位）/ 申請（15分刻み・A-D件名）/ その他（給料受取のみ）
+// /request シフト申請: 不可（週単位）/ 申請（テンプレA-D帯 or 時間指定）/ その他（給料受取のみ）
 
 import { useState } from 'react';
 import { UserLayout } from '../components/UserLayout';
@@ -6,16 +6,24 @@ import { useAuth } from '../contexts/AuthContext';
 import { useData } from '../contexts/DataContext';
 import { useToast } from '../contexts/ToastContext';
 import { Card, Button, Input, Select, Badge, EmptyState } from '../components/ui';
-import { FilePlus, Ban, Clock, Wallet, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { FilePlus, Ban, Clock, Wallet, CheckCircle2, AlertTriangle, Trash2 } from 'lucide-react';
 import { formatDateJP, weekdayJP } from '../lib/utils';
-import { createShift, findShiftByMemberDate } from '../lib/db';
+import { createShift, findShiftByMemberDate, cancelShift } from '../lib/db';
+import { TEMPLATE_LABELS } from '../lib/types';
+import type { TemplateCode } from '../lib/types';
 
 type Mode = 'none' | 'apply' | 'other';
+type SubjectMode = TemplateCode | 'time';
 
-const SUBJECT_OPTIONS = ['A帯', 'B帯', 'C帯', 'D帯'] as const;
-type SubjectOption = (typeof SUBJECT_OPTIONS)[number];
+const SUBJECT_OPTIONS: { value: SubjectMode; label: string; hasTime: boolean }[] = [
+  { value: 'A', label: '件名A帯', hasTime: false },
+  { value: 'B', label: '件名B帯', hasTime: false },
+  { value: 'C', label: '件名C帯', hasTime: false },
+  { value: 'D', label: '件名D帯', hasTime: false },
+  { value: 'time', label: '時間指定', hasTime: true },
+];
 
-// 15分刻みの時刻リスト 00:00〜23:45
+// 15分刻みの時��リスト 00:00〜23:45
 const TIME_OPTIONS: string[] = [];
 for (let h = 0; h < 24; h++) {
   for (const m of [0, 15, 30, 45]) {
@@ -23,11 +31,10 @@ for (let h = 0; h < 24; h++) {
   }
 }
 
-// 任意の日付文字列 → その週の月曜〜日曜を返す（ローカル日付で計算）
 function getWeekRange(dateStr: string): { start: string; end: string } | null {
   if (!dateStr) return null;
   const d = new Date(dateStr + 'T00:00:00');
-  const day = d.getDay(); // 0=日
+  const day = d.getDay();
   const diffToMon = day === 0 ? -6 : 1 - day;
   const monDate = new Date(d);
   monDate.setDate(d.getDate() + diffToMon);
@@ -38,7 +45,6 @@ function getWeekRange(dateStr: string): { start: string; end: string } | null {
   return { start: fmt(monDate), end: fmt(sunDate) };
 }
 
-// 週の月曜日から7日分の日付文字列を返す（ローカル日付）
 function getWeekDates(weekStart: string): string[] {
   return Array.from({ length: 7 }, (_, i) => {
     const d = new Date(weekStart + 'T00:00:00');
@@ -54,16 +60,24 @@ export function RequestPage() {
 
   const [mode, setMode] = useState<Mode>('apply');
   const [date, setDate] = useState('');
-  const [subjectOption, setSubjectOption] = useState<SubjectOption>('A帯');
+  const [subjectMode, setSubjectMode] = useState<SubjectMode>('A');
   const [timeStart, setTimeStart] = useState('09:00');
   const [timeEnd, setTimeEnd] = useState('17:00');
   const [place, setPlace] = useState('');
-  const [headcount, setHeadcount] = useState('1');
   const [submitting, setSubmitting] = useState(false);
+  const [canceling, setCanceling] = useState<string | null>(null);
   const [dupWarning, setDupWarning] = useState<string | null>(null);
 
-  const myRecent = shifts.filter((s) => s.memberName === name).slice(-5);
+  const myRecent = [...shifts.filter((s) => s.memberName === name)]
+    .sort((a, b) => b.createdAt - a.createdAt)
+    .slice(0, 8);
   const weekRange = mode === 'none' ? getWeekRange(date) : null;
+  const currentOption = SUBJECT_OPTIONS.find((o) => o.value === subjectMode)!;
+
+  const subjectLabel = () => {
+    if (subjectMode === 'time') return `時間指定 ${name ?? ''}`;
+    return `件名${TEMPLATE_LABELS[subjectMode as TemplateCode]} ${name ?? ''}`;
+  };
 
   const checkDup = async (d: string) => {
     setDate(d);
@@ -83,12 +97,9 @@ export function RequestPage() {
         await Promise.all(
           dates.map((d) => createShift({ memberName: name, date: d, timeType: 'none', subject: '不可（シフトなし）' }))
         );
-        toast.show(
-          `${formatDateJP(weekRange.start)}〜${formatDateJP(weekRange.end)} を「不可」で申請しました`,
-          'success',
-        );
+        toast.show(`${formatDateJP(weekRange.start)}〜${formatDateJP(weekRange.end)} を「不可」で申請しました`, 'success');
         resetForm();
-      } catch { toast.show('申請に失敗しました', 'error'); }
+      } catch (e) { toast.show(`申請に失敗しました: ${(e as Error).message}`, 'error'); }
       finally { setSubmitting(false); }
       return;
     }
@@ -100,47 +111,71 @@ export function RequestPage() {
         await createShift({ memberName: name, date, timeType: 'other', subject: '給料受取のみ' });
         toast.show('「その他（給料受取のみ）」を申請しました', 'success');
         resetForm();
-      } catch { toast.show('申請に失敗しました', 'error'); }
+      } catch (e) { toast.show(`申請に失敗しました: ${(e as Error).message}`, 'error'); }
       finally { setSubmitting(false); }
       return;
     }
 
     // apply
     if (!date) { toast.show('日付を選択してください', 'error'); return; }
-    if (dupWarning) { toast.show('重複申請のため送信を中止しました', 'error'); return; }
-    if (timeStart >= timeEnd) { toast.show('終了時刻は開始時刻より後にしてください', 'error'); return; }
+    if (dupWarning) { toast.show('重複申���のため送信を中止しました', 'error'); return; }
+    if (subjectMode === 'time' && timeStart >= timeEnd) {
+      toast.show('終了時刻は開始時刻より後にしてください', 'error'); return;
+    }
     setSubmitting(true);
     try {
-      await createShift({
-        memberName: name,
-        date,
-        timeType: 'time',
-        timeStart,
-        timeEnd,
-        subject: `${subjectOption} ${name}`,
-        place: place.trim() || undefined,
-        headcount: Number(headcount) || undefined,
-      });
+      if (subjectMode === 'time') {
+        await createShift({
+          memberName: name,
+          date,
+          timeType: 'time',
+          timeStart,
+          timeEnd,
+          subject: subjectLabel(),
+          place: place.trim() || undefined,
+        });
+      } else {
+        await createShift({
+          memberName: name,
+          date,
+          timeType: 'template',
+          template: subjectMode as TemplateCode,
+          subject: subjectLabel(),
+          place: place.trim() || undefined,
+        });
+      }
       toast.show('シフトを申請しました', 'success');
       resetForm();
-    } catch { toast.show('申請に失敗しました', 'error'); }
+    } catch (e) { toast.show(`申請に失敗しました: ${(e as Error).message}`, 'error'); }
     finally { setSubmitting(false); }
   };
 
+  const handleCancel = async (shiftId: string, shiftVersion: number, label: string) => {
+    if (!window.confirm(`「${label}」の申請を取り消しますか？`)) return;
+    setCanceling(shiftId);
+    try {
+      const result = await cancelShift(shiftId, shiftVersion);
+      if (result === 'forbidden') { toast.show('確定済みのシフトは取り消せません', 'error'); return; }
+      if (result === 'conflict') { toast.show('データが更新されました。再度お試しください', 'error'); return; }
+      toast.show('申請を取り消しました', 'success');
+    } catch { toast.show('取り消しに失敗しました', 'error'); }
+    finally { setCanceling(null); }
+  };
+
   const resetForm = () => {
-    setDate(''); setPlace(''); setHeadcount('1'); setDupWarning(null);
+    setDate(''); setPlace(''); setDupWarning(null);
   };
 
   const modeCards: { id: Mode; label: string; desc: string; icon: typeof Ban; color: string }[] = [
     { id: 'none', label: '不可（シフトなし）', desc: '指定週まるごと入れません', icon: Ban, color: 'border-gray-200 hover:border-gray-400' },
-    { id: 'apply', label: 'シフト申請', desc: '時間・件名を指定して申請', icon: Clock, color: 'border-brand-200 hover:border-brand-400' },
+    { id: 'apply', label: 'シフト申請', desc: '件���・時間を指��して申請', icon: Clock, color: 'border-brand-200 hover:border-brand-400' },
     { id: 'other', label: 'その他（給料受取のみ）', desc: '出勤せず給料のみ受取', icon: Wallet, color: 'border-amber-200 hover:border-amber-400' },
   ];
 
   return (
     <UserLayout>
       <div className="mb-4">
-        <h1 className="text-lg font-bold text-gray-900">シフト申請</h1>
+        <h1 className="text-lg font-bold text-gray-900">���フト申請</h1>
         <p className="text-sm text-gray-500">まず申請の種類を選んでください</p>
       </div>
 
@@ -161,7 +196,7 @@ export function RequestPage() {
       <Card className="p-5 mb-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
-          {/* 不可モード: 週選択 */}
+          {/* 不可��ード */}
           {mode === 'none' && (
             <div className="sm:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
@@ -172,7 +207,7 @@ export function RequestPage() {
                 <div className="mt-2 flex items-center gap-2 bg-red-50 text-red-700 text-sm px-3 py-2 rounded-lg">
                   <Ban className="w-4 h-4 shrink-0" />
                   <span>
-                    <strong>{formatDateJP(weekRange.start)}（月）〜{formatDateJP(weekRange.end)}（日）</strong> を不可で申請します
+                    <strong>{formatDateJP(weekRange.start)}（月���〜{formatDateJP(weekRange.end)}（日）</strong> を不可で申請します
                   </span>
                 </div>
               )}
@@ -187,7 +222,7 @@ export function RequestPage() {
                 <Input type="date" value={date} onChange={(e) => checkDup(e.target.value)} />
                 {date && (
                   <p className={`text-xs mt-1 ${weekdayJP(date) === '日' ? 'text-red-500' : weekdayJP(date) === '土' ? 'text-blue-500' : 'text-gray-500'}`}>
-                    {formatDateJP(date)}
+                    {formatDateJP(date)}（{weekdayJP(date)}）
                   </p>
                 )}
                 {dupWarning && (
@@ -198,37 +233,38 @@ export function RequestPage() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">件名</label>
-                <Select value={subjectOption} onChange={(e) => setSubjectOption(e.target.value as SubjectOption)}>
-                  {SUBJECT_OPTIONS.map((s) => (
-                    <option key={s} value={s}>{s}</option>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5">件名（テンプレート）</label>
+                <Select value={subjectMode} onChange={(e) => setSubjectMode(e.target.value as SubjectMode)}>
+                  {SUBJECT_OPTIONS.map((o) => (
+                    <option key={o.value} value={o.value}>{o.label}</option>
                   ))}
                 </Select>
-                <p className="text-xs text-gray-400 mt-1">送信件名: 「{subjectOption} {name ?? '…'}」</p>
+                <p className="text-xs text-gray-400 mt-1">
+                  送信件名:「<strong>{subjectLabel()}</strong>」
+                </p>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">開始時刻</label>
-                <Select value={timeStart} onChange={(e) => setTimeStart(e.target.value)}>
-                  {TIME_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
-                </Select>
-              </div>
+              {/* 時間指定の場合のみ時間���ィールドを表示 */}
+              {currentOption.hasTime && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">開始時刻</label>
+                    <Select value={timeStart} onChange={(e) => setTimeStart(e.target.value)}>
+                      {TIME_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
+                    </Select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1.5">終了時刻</label>
+                    <Select value={timeEnd} onChange={(e) => setTimeEnd(e.target.value)}>
+                      {TIME_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
+                    </Select>
+                  </div>
+                </>
+              )}
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">終了時刻</label>
-                <Select value={timeEnd} onChange={(e) => setTimeEnd(e.target.value)}>
-                  {TIME_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
-                </Select>
-              </div>
-
-              <div>
+              <div className={currentOption.hasTime ? '' : 'sm:col-span-2'}>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">場所（任意）</label>
                 <Input value={place} onChange={(e) => setPlace(e.target.value)} placeholder="例: 本店" />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1.5">人数（任意）</label>
-                <Input type="number" min="1" value={headcount} onChange={(e) => setHeadcount(e.target.value)} />
               </div>
             </>
           )}
@@ -240,7 +276,7 @@ export function RequestPage() {
               <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
               {date && (
                 <p className={`text-xs mt-1 ${weekdayJP(date) === '日' ? 'text-red-500' : weekdayJP(date) === '土' ? 'text-blue-500' : 'text-gray-500'}`}>
-                  {formatDateJP(date)}
+                  {formatDateJP(date)}（{weekdayJP(date)}）
                 </p>
               )}
             </div>
@@ -254,7 +290,7 @@ export function RequestPage() {
             onClick={handleSubmit}
             disabled={submitting || (mode === 'apply' && !!dupWarning)}
           >
-            {submitting ? '送信中…' : mode === 'none' ? '週まとめて不可を申請' : '申請を送信'}
+            {submitting ? '送信中…' : mode === 'none' ? '週まと���て不��を申請' : '申請を送信'}
             {!submitting && <CheckCircle2 className="w-4 h-4" />}
           </Button>
         </div>
@@ -262,7 +298,7 @@ export function RequestPage() {
 
       <Card className="p-5">
         <h2 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5">
-          <FilePlus className="w-4 h-4" />最近の自分の申請
+          <FilePlus className="w-4 h-4" />最近の自��の申請
         </h2>
         {myRecent.length === 0 ? (
           <EmptyState icon={<FilePlus className="w-8 h-8" />} title="まだ申請がありません" />
@@ -270,11 +306,27 @@ export function RequestPage() {
           <div className="space-y-2">
             {myRecent.map((s) => (
               <div key={s.id} className="flex items-center justify-between py-2 px-3 rounded-lg bg-gray-50">
-                <div className="flex items-center gap-2">
-                  <Badge color={s.status === 'confirmed' ? 'confirmed' : 'plan'}>{s.status === 'confirmed' ? '確定' : '予定'}</Badge>
-                  <span className="text-sm text-gray-700">{formatDateJP(s.date)} · {s.subject}</span>
+                <div className="flex items-center gap-2 flex-1 min-w-0">
+                  <Badge color={s.status === 'confirmed' ? 'confirmed' : 'plan'}>
+                    {s.status === 'confirmed' ? '確定' : '予定'}
+                  </Badge>
+                  <span className="text-sm text-gray-700 truncate">{formatDateJP(s.date)} · {s.subject}</span>
                 </div>
-                <span className="text-xs text-gray-400">申請日 {new Date(s.createdAt).toLocaleDateString()}</span>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-xs text-gray-400 hidden sm:inline">
+                    {new Date(s.createdAt).toLocaleDateString()}
+                  </span>
+                  {s.status === 'plan' && (
+                    <button
+                      onClick={() => handleCancel(s.id, s.version, s.subject)}
+                      disabled={canceling === s.id}
+                      className="text-gray-300 hover:text-red-500 p-1 rounded hover:bg-red-50 transition-colors"
+                      title="申���取消"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
               </div>
             ))}
           </div>

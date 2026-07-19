@@ -6,14 +6,15 @@ import { useData } from '../contexts/DataContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { Card, EmptyState, Badge, Button, Tabs } from '../components/ui';
-import { Copy, CalendarDays, CheckCircle2, Clock } from 'lucide-react';
+import { Copy, CalendarDays, CheckCircle2, Clock, Trash2 } from 'lucide-react';
 import { formatDateJP, copyToClipboard, todayStr, weekdayJP } from '../lib/utils';
 import { TEMPLATE_LABELS } from '../lib/types';
 import type { Shift } from '../lib/types';
+import { cancelShift } from '../lib/db';
 
 type Tab = 'today' | 'plan' | 'confirmed';
 
-function ShiftCard({ shift, onCopy }: { shift: Shift; onCopy: (text: string, label: string) => void }) {
+function ShiftCard({ shift, onCopy, onCancel }: { shift: Shift; onCopy: (text: string, label: string) => void; onCancel?: (shift: Shift) => void }) {
   const timeLabel =
     shift.timeType === 'template' && shift.template
       ? TEMPLATE_LABELS[shift.template]
@@ -50,6 +51,11 @@ function ShiftCard({ shift, onCopy }: { shift: Shift; onCopy: (text: string, lab
         <Button size="sm" variant="secondary" onClick={() => onCopy(`${formatDateJP(shift.date)} ${shift.subject} ${timeLabel}${shift.place ? ` 場所:${shift.place}` : ''}`, '1日分コピーしました')}>
           <Copy className="w-3.5 h-3.5" />1日分
         </Button>
+        {shift.status === 'plan' && onCancel && (
+          <Button size="sm" variant="secondary" className="ml-auto text-red-500 hover:bg-red-50" onClick={() => onCancel(shift)}>
+            <Trash2 className="w-3.5 h-3.5" />申請取消
+          </Button>
+        )}
       </div>
     </Card>
   );
@@ -60,7 +66,20 @@ export function PersonalPage() {
   const { name } = useAuth();
   const toast = useToast();
   const [tab, setTab] = useState<Tab>('today');
+  const [canceling, setCanceling] = useState<string | null>(null);
   const today = todayStr();
+
+  const handleCancel = async (shift: Shift) => {
+    if (!window.confirm(`${formatDateJP(shift.date)} の「${shift.subject}」の申請を取り消しますか？`)) return;
+    setCanceling(shift.id);
+    try {
+      const result = await cancelShift(shift.id, shift.version);
+      if (result === 'forbidden') { toast.show('確定済みのシフトは取り消せま���ん', 'error'); return; }
+      if (result === 'conflict') { toast.show('デ��タが更新されました。再度お試しください', 'error'); return; }
+      toast.show('申請を取り消しました', 'success');
+    } catch { toast.show('取り消しに失敗しました', 'error'); }
+    finally { setCanceling(null); }
+  };
 
   const mine = useMemo(() => shifts.filter((s) => s.memberName === name).sort((a, b) => a.date.localeCompare(b.date)), [shifts, name]);
 
@@ -105,7 +124,7 @@ export function PersonalPage() {
       ) : (
         <div className="space-y-3">
           {list.map((s) => (
-            <ShiftCard key={s.id} shift={s} onCopy={handleCopy} />
+            <ShiftCard key={s.id} shift={s} onCopy={handleCopy} onCancel={canceling ? undefined : handleCancel} />
           ))}
         </div>
       )}

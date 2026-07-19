@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 import { AdminLayout } from '../components/AdminLayout';
 import { useData } from '../contexts/DataContext';
 import { useToast } from '../contexts/ToastContext';
+import { useAuth } from '../contexts/AuthContext';
 import { Card, Button, Badge, Input, Select, Modal, EmptyState } from '../components/ui';
 import {
   CheckCircle2, XCircle, Sliders, RotateCcw, Users, MessageCircle, MapPin, Clock, User as UserIcon,
@@ -15,7 +16,6 @@ import type { Shift, ApprovalLog } from '../lib/types';
 import { approveShift, restoreShift } from '../lib/db';
 
 type SortKey = 'place' | 'time' | 'name' | 'weekday' | 'headcount';
-const ADMIN_NAME = '管理者';
 
 function timeLabelOf(s: Shift): string {
   if (s.timeType === 'template' && s.template) return TEMPLATE_LABELS[s.template];
@@ -31,6 +31,8 @@ function timeSortVal(s: Shift): number {
 
 export function AdminShiftPage() {
   const { shifts, members, approvalLogs } = useData();
+  const { name } = useAuth();
+  const adminName = name ?? '管理者';
   const toast = useToast();
   const [sortKey, setSortKey] = useState<SortKey>('weekday');
   const [filter, setFilter] = useState<'all' | 'plan' | 'confirmed'>('plan');
@@ -69,14 +71,14 @@ export function AdminShiftPage() {
   const planCount = shifts.filter((s) => s.status === 'plan').length;
 
   const doApprove = async (s: Shift) => {
-    const res = await approveShift({ shiftId: s.id, action: 'approve', adminName: ADMIN_NAME, expectedVersion: s.version });
+    const res = await approveShift({ shiftId: s.id, action: 'approve', adminName: adminName, expectedVersion: s.version });
     if (res === 'ok') toast.show(`${s.memberName}さんのシフトを確定しました`, 'success');
     else if (res === 'conflict') toast.show('競合: 最新データを再取得してください（画面を更新）', 'error');
     else toast.show('承認に失敗しました', 'error');
   };
 
   const doDeny = async (s: Shift) => {
-    const res = await approveShift({ shiftId: s.id, action: 'deny', adminName: ADMIN_NAME, expectedVersion: s.version });
+    const res = await approveShift({ shiftId: s.id, action: 'deny', adminName: adminName, expectedVersion: s.version });
     if (res === 'ok') toast.show(`${s.memberName}さんのシフトを否認（planに戻しました）`, 'info');
     else if (res === 'conflict') toast.show('競合: 画面を更新してください', 'error');
   };
@@ -94,7 +96,7 @@ export function AdminShiftPage() {
     const res = await approveShift({
       shiftId: adjusting.id,
       action: 'adjust',
-      adminName: ADMIN_NAME,
+      adminName: adminName,
       expectedVersion: adjusting.version,
       adjustFields: { timeStart: adjTimeStart, timeEnd: adjTimeEnd, subject: adjSubject.trim(), place: adjPlace.trim() || undefined, timeType: 'time' },
     });

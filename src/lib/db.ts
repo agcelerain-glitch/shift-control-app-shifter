@@ -138,6 +138,31 @@ export async function createShift(input: CreateShiftInput): Promise<void> {
   await addDoc(collection(db!, 'shifts'), payload);
 }
 
+// planステータスのシフトのみキャンセル可（confirmed済みは不可）
+export async function cancelShift(shiftId: string, expectedVersion: number): Promise<'ok' | 'conflict' | 'forbidden'> {
+  if (!isFirebaseConfigured) {
+    mockStore.deleteDoc('shifts', shiftId);
+    return 'ok';
+  }
+  const shiftRef = doc(db!, 'shifts', shiftId);
+  try {
+    await runTransaction(db!, async (tx) => {
+      const snap = await tx.get(shiftRef);
+      if (!snap.exists()) throw new Error('not found');
+      const data = snap.data() as Record<string, unknown>;
+      if (data.status === 'confirmed') throw new Error('FORBIDDEN');
+      if ((data.version as number) !== expectedVersion) throw new Error('CONFLICT');
+      tx.delete(shiftRef);
+    });
+    return 'ok';
+  } catch (e) {
+    const msg = (e as Error).message;
+    if (msg === 'CONFLICT') return 'conflict';
+    if (msg === 'FORBIDDEN') return 'forbidden';
+    throw e;
+  }
+}
+
 // ---- トランザクションで安全に承認/否認/調整（version楽観ロック） ----
 export interface ApproveParams {
   shiftId: string;

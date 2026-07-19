@@ -64,6 +64,15 @@ export function UserLayout({ children }: { children: ReactNode }) {
       </nav>
 
       <main className="max-w-5xl mx-auto px-4 py-6 animate-fadeIn">{children}</main>
+
+      <footer className="mt-8 pb-6 text-center">
+        <button
+          onClick={() => navigate('/admin-top')}
+          className="text-xs text-gray-300 hover:text-gray-500 transition-colors"
+        >
+          管理者ログイン
+        </button>
+      </footer>
     </div>
   );
 }

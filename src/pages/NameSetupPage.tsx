@@ -6,19 +6,29 @@ import { User, ArrowRight } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
 import { Button, Input } from '../components/ui';
-
+import { upsertMember } from '../lib/db';
 
 export function NameSetupPage() {
   const { setName, name, role } = useAuth();
   const toast = useToast();
   const navigate = useNavigate();
   const [value, setValue] = useState(name ?? '');
+  const [saving, setSaving] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = value.trim();
     if (!trimmed) {
       toast.show('名前を入力してください', 'error');
+      return;
+    }
+    setSaving(true);
+    try {
+      // Firestoreのmembersコレクションに書き込み（本番では必須）
+      await upsertMember(trimmed);
+    } catch (err) {
+      toast.show(`名前の保存に失敗しました: ${(err as Error).message}`, 'error');
+      setSaving(false);
       return;
     }
     setName(trimmed);
@@ -43,13 +53,14 @@ export function NameSetupPage() {
             <Input
               value={value}
               onChange={(e) => setValue(e.target.value)}
-              placeholder="例: 山田 花子"
+              placeholder="例: 山田花子"
               autoFocus
             />
+            <p className="text-xs text-gray-400 mt-1">LINEで名前登録するときと完全一致させてください</p>
           </div>
-          <Button type="submit" size="lg" className="w-full">
-            次へ
-            <ArrowRight className="w-4 h-4" />
+          <Button type="submit" size="lg" className="w-full" disabled={saving}>
+            {saving ? '保存中…' : '次へ'}
+            {!saving && <ArrowRight className="w-4 h-4" />}
           </Button>
         </form>
       </div>

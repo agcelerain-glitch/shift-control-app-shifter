@@ -214,9 +214,11 @@ export async function approveShift(p: ApproveParams): Promise<'ok' | 'conflict'>
         next.status = 'confirmed';
       }
       tx.set(shiftRef, next, { merge: true });
+      // beforeStateのundefinedフィールドを除去（不可シフトはtimeStart等がundefined）
+      const cleanBeforeState = Object.fromEntries(Object.entries(beforeState).filter(([, v]) => v !== undefined));
       tx.set(logRef, {
         shiftId: p.shiftId,
-        beforeState,
+        beforeState: cleanBeforeState,
         action: p.action,
         adminName: p.adminName,
         createdAt: serverTimestamp(),
@@ -306,6 +308,15 @@ export async function createBoardPrivate(body: string, type: 'memo' | 'notificat
 export async function deleteBoardPrivate(id: string): Promise<void> {
   if (!isFirebaseConfigured) return mockStore.deleteDoc('boardPrivate', id);
   await deleteDoc(doc(db!, 'boardPrivate', id));
+}
+
+// admin用: メンバーのLINE IDを手動設定（デバッグ・初期設定用）
+export async function updateMemberLineId(memberId: string, lineUserId: string): Promise<void> {
+  if (!isFirebaseConfigured || !db) return;
+  await setDoc(doc(db, 'members', memberId), {
+    lineUserId: lineUserId.trim() || null,
+    updatedAt: serverTimestamp(),
+  }, { merge: true });
 }
 
 // LINE API（Heroku）へのfetchラッパー。トークンはフロントに置かない

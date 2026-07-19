@@ -13,7 +13,7 @@ import {
 import { formatDateJP, formatDateTimeJP, isPast7Days, weekdayJP, todayStr } from '../lib/utils';
 import { TEMPLATE_LABELS } from '../lib/types';
 import type { Shift, ApprovalLog } from '../lib/types';
-import { approveShift, restoreShift } from '../lib/db';
+import { approveShift, restoreShift, updateMemberLineId } from '../lib/db';
 
 type SortKey = 'place' | 'time' | 'name' | 'weekday' | 'headcount';
 
@@ -44,6 +44,8 @@ export function AdminShiftPage() {
   const [membersOpen, setMembersOpen] = useState(false);
   const [selectedMember, setSelectedMember] = useState<string | null>(null);
   const [logOpen, setLogOpen] = useState(false);
+  const [lineIdDraft, setLineIdDraft] = useState('');
+  const [savingLineId, setSavingLineId] = useState(false);
 
   // 調整モーダルのフィールド
   const [adjTimeStart, setAdjTimeStart] = useState('');
@@ -134,6 +136,19 @@ export function AdminShiftPage() {
 
   const memberShifts = selectedMember ? shifts.filter((s) => s.memberName === selectedMember) : [];
   const memberInfo = members.find((m) => m.name === selectedMember);
+
+  const handleSaveLineId = async () => {
+    if (!memberInfo) return;
+    setSavingLineId(true);
+    try {
+      await updateMemberLineId(memberInfo.id, lineIdDraft);
+      toast.show('LINE IDを保存しました', 'success');
+    } catch (e) {
+      toast.show(`保存失敗: ${(e as Error).message}`, 'error');
+    } finally {
+      setSavingLineId(false);
+    }
+  };
 
   const sortTabs: { id: SortKey; label: string; icon: typeof MapPin }[] = [
     { id: 'weekday', label: '曜日', icon: CalendarDays },
@@ -287,12 +302,15 @@ export function AdminShiftPage() {
               members.map((m) => (
                 <button
                   key={m.id}
-                  onClick={() => setSelectedMember(m.name)}
+                  onClick={() => { setSelectedMember(m.name); setLineIdDraft(m.lineUserId ?? ''); }}
                   className="w-full flex items-center justify-between p-3 rounded-lg hover:bg-gray-50 transition group"
                 >
                   <div className="flex items-center gap-2">
                     <ChevronRight className="w-4 h-4 text-gray-300 group-hover:text-gray-500" />
                     <span className="text-sm font-medium text-gray-800">{m.name}</span>
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium ${m.lineUserId ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-400'}`}>
+                      {m.lineUserId ? 'LINE済' : '未登録'}
+                    </span>
                   </div>
                   <span className="text-xs text-gray-400">記入 {new Date(m.createdAt).toLocaleDateString()}</span>
                 </button>
@@ -325,6 +343,22 @@ export function AdminShiftPage() {
               <div className="bg-gray-50 rounded-lg p-2">
                 <p className="text-gray-400">最終更新日</p>
                 <p className="text-gray-700 font-medium">{memberInfo ? formatDateTimeJP(memberInfo.updatedAt) : '—'}</p>
+              </div>
+            </div>
+            {/* LINE ID 表示・手動設定 */}
+            <div className="mb-3 p-3 rounded-lg bg-gray-50 text-xs">
+              <p className="text-gray-400 mb-1">LINE ID</p>
+              <p className="text-gray-600 font-mono break-all mb-2">{memberInfo?.lineUserId ?? '未登録'}</p>
+              <div className="flex gap-2">
+                <Input
+                  value={lineIdDraft}
+                  onChange={(e) => setLineIdDraft(e.target.value)}
+                  placeholder="U000...（手動設定）"
+                  className="text-xs flex-1"
+                />
+                <Button size="sm" variant="secondary" onClick={handleSaveLineId} disabled={savingLineId}>
+                  {savingLineId ? '…' : '保存'}
+                </Button>
               </div>
             </div>
             <p className="text-xs font-medium text-gray-600 mb-2">申請履歴</p>

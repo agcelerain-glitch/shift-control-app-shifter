@@ -74,16 +74,23 @@ export function AdminShiftPage() {
   const planCount = shifts.filter((s) => s.status === 'plan').length;
 
   const doApprove = async (s: Shift) => {
-    const res = await approveShift({ shiftId: s.id, action: 'approve', adminName: adminName, expectedVersion: s.version });
-    if (res === 'ok') toast.show(`${s.memberName}さんのシフトを確定しました`, 'success');
-    else if (res === 'conflict') toast.show('競合: 最新データを再取得してください（画面を更新）', 'error');
-    else toast.show('承認に失敗しました', 'error');
+    try {
+      const res = await approveShift({ shiftId: s.id, action: 'approve', adminName: adminName, expectedVersion: s.version });
+      if (res === 'ok') toast.show(`${s.memberName}さんのシフトを確定しました`, 'success');
+      else if (res === 'conflict') toast.show('競合: 最新データを再取得してください（画面を更新）', 'error');
+    } catch (e) {
+      toast.show(`承認エラー: ${(e as Error).message}`, 'error');
+    }
   };
 
   const doDeny = async (s: Shift) => {
-    const res = await approveShift({ shiftId: s.id, action: 'deny', adminName: adminName, expectedVersion: s.version });
-    if (res === 'ok') toast.show(`${s.memberName}さんのシフトを否認（planに戻しました）`, 'info');
-    else if (res === 'conflict') toast.show('競合: 画面を更新してください', 'error');
+    try {
+      const res = await approveShift({ shiftId: s.id, action: 'deny', adminName: adminName, expectedVersion: s.version });
+      if (res === 'ok') toast.show(`${s.memberName}さんのシフトを否認（planに戻しました）`, 'info');
+      else if (res === 'conflict') toast.show('競合: 画面を更新してください', 'error');
+    } catch (e) {
+      toast.show(`否認エラー: ${(e as Error).message}`, 'error');
+    }
   };
 
   const openAdjust = (s: Shift) => {
@@ -96,20 +103,26 @@ export function AdminShiftPage() {
 
   const doAdjust = async () => {
     if (!adjusting) return;
-    const res = await approveShift({
-      shiftId: adjusting.id,
-      action: 'adjust',
-      adminName: adminName,
-      expectedVersion: adjusting.version,
-      adjustFields: {
-        ...(adjusting.timeType !== 'none' && { timeStart: adjTimeStart, timeEnd: adjTimeEnd, timeType: 'time' as const }),
-        ...(adjusting.timeType === 'none' && { timeType: 'none' as const }),
+    try {
+      const adjustFields: Parameters<typeof approveShift>[0]['adjustFields'] = {
         subject: adjSubject.trim(),
-        ...(adjPlace.trim() && { place: adjPlace.trim() }),
-      },
-    });
-    if (res === 'ok') { toast.show('調整して確定しました', 'success'); setAdjusting(null); }
-    else if (res === 'conflict') toast.show('競合: 画面を更新してください', 'error');
+        ...(adjPlace.trim() ? { place: adjPlace.trim() } : {}),
+        ...(adjusting.timeType !== 'none'
+          ? { timeStart: adjTimeStart, timeEnd: adjTimeEnd, timeType: 'time' as const }
+          : { timeType: 'none' as const }),
+      };
+      const res = await approveShift({
+        shiftId: adjusting.id,
+        action: 'adjust',
+        adminName: adminName,
+        expectedVersion: adjusting.version,
+        adjustFields,
+      });
+      if (res === 'ok') { toast.show('調整して確定しました', 'success'); setAdjusting(null); }
+      else if (res === 'conflict') toast.show('競合: 画面を更新してください', 'error');
+    } catch (e) {
+      toast.show(`調整エラー: ${(e as Error).message}`, 'error');
+    }
   };
 
   const doRestore = async (log: ApprovalLog) => {

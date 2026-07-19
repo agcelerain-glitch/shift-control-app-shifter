@@ -19,7 +19,8 @@ export const isFirebaseConfigured = Boolean(cfg.apiKey && cfg.projectId);
 
 export const USER_EMAIL = import.meta.env.VITE_USER_EMAIL as string | undefined;
 export const ADMIN_EMAIL = import.meta.env.VITE_ADMIN_EMAIL as string | undefined;
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL as string | undefined;
+// 末尾スラッシュを除去: /line/xxx と組み合わせたとき //line/xxx になるのを防ぐ
+export const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/+$/, '');
 
 let app: FirebaseApp | null = null;
 let auth: Auth | null = null;

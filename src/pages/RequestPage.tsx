@@ -55,7 +55,7 @@ function getWeekDates(weekStart: string): string[] {
 
 export function RequestPage() {
   const { name } = useAuth();
-  const { shifts } = useData();
+  const { shifts, firestoreError } = useData();
   const toast = useToast();
 
   const [mode, setMode] = useState<Mode>('apply');
@@ -68,9 +68,9 @@ export function RequestPage() {
   const [canceling, setCanceling] = useState<string | null>(null);
   const [dupWarning, setDupWarning] = useState<string | null>(null);
 
+  // 件数制限なし・日付降順で全申請を表示（不可申請も含めてすべて確認・取り消し可能にする）
   const myRecent = [...shifts.filter((s) => s.memberName === name)]
-    .sort((a, b) => b.createdAt - a.createdAt)
-    .slice(0, 8);
+    .sort((a, b) => b.date.localeCompare(a.date));
   const weekRange = mode === 'none' ? getWeekRange(date) : null;
   const currentOption = SUBJECT_OPTIONS.find((o) => o.value === subjectMode)!;
 
@@ -177,6 +177,9 @@ export function RequestPage() {
       <div className="mb-4">
         <h1 className="text-lg font-bold text-gray-900">���フト申請</h1>
         <p className="text-sm text-gray-500">まず申請の種類を選んでください</p>
+        {firestoreError && (
+          <p className="mt-2 text-xs text-red-600 bg-red-50 px-3 py-2 rounded-lg">{firestoreError}</p>
+        )}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-5">

@@ -17,6 +17,9 @@ import { approveShift, restoreShift } from '../lib/db';
 
 type SortKey = 'place' | 'time' | 'name' | 'weekday' | 'headcount';
 
+// 場所選択肢（4択）— 実際の店舗名に合わせて変更してください
+const PLACE_OPTIONS = ['本店', '支店A', '支店B', '倉庫'] as const;
+
 function timeLabelOf(s: Shift): string {
   if (s.timeType === 'template' && s.template) return TEMPLATE_LABELS[s.template];
   if (s.timeType === 'time') return `${s.timeStart}〜${s.timeEnd}`;
@@ -241,7 +244,12 @@ export function AdminShiftPage() {
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">場所</label>
-              <Input value={adjPlace} onChange={(e) => setAdjPlace(e.target.value)} />
+              <Select value={adjPlace} onChange={(e) => setAdjPlace(e.target.value)}>
+                <option value="">指定なし</option>
+                {PLACE_OPTIONS.map((p) => (
+                  <option key={p} value={p}>{p}</option>
+                ))}
+              </Select>
             </div>
           </div>
         )}

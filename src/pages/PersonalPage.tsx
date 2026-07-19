@@ -62,7 +62,7 @@ function ShiftCard({ shift, onCopy, onCancel }: { shift: Shift; onCopy: (text: s
 }
 
 export function PersonalPage() {
-  const { shifts } = useData();
+  const { shifts, firestoreError } = useData();
   const { name } = useAuth();
   const toast = useToast();
   const [tab, setTab] = useState<Tab>('today');
@@ -81,9 +81,13 @@ export function PersonalPage() {
     finally { setCanceling(null); }
   };
 
-  const mine = useMemo(() => shifts.filter((s) => s.memberName === name).sort((a, b) => a.date.localeCompare(b.date)), [shifts, name]);
+  const mine = useMemo(
+    () => shifts.filter((s) => s.memberName === name).sort((a, b) => a.date.localeCompare(b.date)),
+    [shifts, name],
+  );
 
   const todayList = mine.filter((s) => s.date === today);
+  // 過去の未確定も含めて全件表示（取り消しできるようにするため日付絞り込みなし）
   const planList = mine.filter((s) => s.status === 'plan' && s.date !== today);
   const confirmedList = mine.filter((s) => s.status === 'confirmed' && s.date !== today);
 
@@ -99,6 +103,9 @@ export function PersonalPage() {
       <div className="mb-4">
         <h1 className="text-lg font-bold text-gray-900">{name}さんのシフト</h1>
         <p className="text-sm text-gray-500">個人カレンダーへの転記用にコピーできます</p>
+        {firestoreError && (
+          <p className="mt-2 text-xs text-red-600 bg-red-50 px-3 py-2 rounded-lg">{firestoreError}</p>
+        )}
       </div>
 
       <div className="bg-white rounded-2xl shadow-card border border-gray-100 mb-4">

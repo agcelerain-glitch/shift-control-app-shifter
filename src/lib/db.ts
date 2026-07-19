@@ -127,8 +127,10 @@ export interface CreateShiftInput {
 }
 
 export async function createShift(input: CreateShiftInput): Promise<void> {
+  // Firestoreはundefinedを拒否するため、undefinedプロパティを除外してから送信
+  const clean = Object.fromEntries(Object.entries(input).filter(([, v]) => v !== undefined));
   const payload = {
-    ...input,
+    ...clean,
     status: 'plan' as ShiftStatus,
     createdAt: serverTimestamp(),
     updatedAt: serverTimestamp(),

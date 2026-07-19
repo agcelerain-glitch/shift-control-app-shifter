@@ -101,7 +101,12 @@ export function AdminShiftPage() {
       action: 'adjust',
       adminName: adminName,
       expectedVersion: adjusting.version,
-      adjustFields: { timeStart: adjTimeStart, timeEnd: adjTimeEnd, subject: adjSubject.trim(), place: adjPlace.trim() || undefined, timeType: 'time' },
+      adjustFields: {
+        ...(adjusting.timeType !== 'none' && { timeStart: adjTimeStart, timeEnd: adjTimeEnd, timeType: 'time' as const }),
+        ...(adjusting.timeType === 'none' && { timeType: 'none' as const }),
+        subject: adjSubject.trim(),
+        ...(adjPlace.trim() && { place: adjPlace.trim() }),
+      },
     });
     if (res === 'ok') { toast.show('調整して確定しました', 'success'); setAdjusting(null); }
     else if (res === 'conflict') toast.show('競合: 画面を更新してください', 'error');
@@ -188,7 +193,9 @@ export function AdminShiftPage() {
                     </div>
                     <p className="font-medium text-gray-900">{s.memberName} · {s.subject}</p>
                     <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-gray-500 mt-1">
-                      <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{timeLabelOf(s)}</span>
+                      {s.timeType === 'time' && (
+                        <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{s.timeStart}〜{s.timeEnd}</span>
+                      )}
                       {s.place && <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{s.place}</span>}
                       {s.headcount && <span className="flex items-center gap-1"><Hash className="w-3 h-3" />{s.headcount}人</span>}
                     </div>
@@ -228,16 +235,18 @@ export function AdminShiftPage() {
         {adjusting && (
           <div className="space-y-3">
             <p className="text-sm text-gray-600">{adjusting.memberName} · {formatDateJP(adjusting.date)}</p>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">開始</label>
-                <Input type="time" value={adjTimeStart} onChange={(e) => setAdjTimeStart(e.target.value)} />
+            {adjusting.timeType !== 'none' && (
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">開始</label>
+                  <Input type="time" value={adjTimeStart} onChange={(e) => setAdjTimeStart(e.target.value)} />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">終了</label>
+                  <Input type="time" value={adjTimeEnd} onChange={(e) => setAdjTimeEnd(e.target.value)} />
+                </div>
               </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">終了</label>
-                <Input type="time" value={adjTimeEnd} onChange={(e) => setAdjTimeEnd(e.target.value)} />
-              </div>
-            </div>
+            )}
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">件名</label>
               <Input value={adjSubject} onChange={(e) => setAdjSubject(e.target.value)} />

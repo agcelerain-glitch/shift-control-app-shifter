@@ -23,7 +23,7 @@ const SUBJECT_OPTIONS: { value: SubjectMode; label: string; hasTime: boolean }[]
   { value: 'time', label: '時間指定', hasTime: true },
 ];
 
-// 15分刻みの時��リスト 00:00〜23:45
+// 15分刻みの時刻リスト 00:00〜23:45
 const TIME_OPTIONS: string[] = [];
 for (let h = 0; h < 24; h++) {
   for (const m of [0, 15, 30, 45]) {
@@ -68,7 +68,7 @@ export function RequestPage() {
   const [canceling, setCanceling] = useState<string | null>(null);
   const [dupWarning, setDupWarning] = useState<string | null>(null);
 
-  // 件数制限なし・日付降順で全申請を表示（不可申請も含めてすべて確認・取り消し可能にする）
+  // 件数制限なし・日付降順で全申請を表示
   const myRecent = [...shifts.filter((s) => s.memberName === name)]
     .sort((a, b) => b.date.localeCompare(a.date));
   const weekRange = mode === 'none' ? getWeekRange(date) : null;
@@ -118,7 +118,7 @@ export function RequestPage() {
 
     // apply
     if (!date) { toast.show('日付を選択してください', 'error'); return; }
-    if (dupWarning) { toast.show('重複申���のため送信を中止しました', 'error'); return; }
+    if (dupWarning) { toast.show('重複申請のため送信を中止しました', 'error'); return; }
     if (subjectMode === 'time' && timeStart >= timeEnd) {
       toast.show('終了時刻は開始時刻より後にしてください', 'error'); return;
     }
@@ -132,7 +132,7 @@ export function RequestPage() {
           timeStart,
           timeEnd,
           subject: subjectLabel(),
-          place: place.trim() || undefined,
+          ...(place.trim() && { place: place.trim() }),
         });
       } else {
         await createShift({
@@ -141,7 +141,7 @@ export function RequestPage() {
           timeType: 'template',
           template: subjectMode as TemplateCode,
           subject: subjectLabel(),
-          place: place.trim() || undefined,
+          ...(place.trim() && { place: place.trim() }),
         });
       }
       toast.show('シフトを申請しました', 'success');
@@ -168,14 +168,14 @@ export function RequestPage() {
 
   const modeCards: { id: Mode; label: string; desc: string; icon: typeof Ban; color: string }[] = [
     { id: 'none', label: '不可（シフトなし）', desc: '指定週まるごと入れません', icon: Ban, color: 'border-gray-200 hover:border-gray-400' },
-    { id: 'apply', label: 'シフト申請', desc: '件���・時間を指��して申請', icon: Clock, color: 'border-brand-200 hover:border-brand-400' },
+    { id: 'apply', label: 'シフト申請', desc: '件名・時間を指定して申請', icon: Clock, color: 'border-brand-200 hover:border-brand-400' },
     { id: 'other', label: 'その他（給料受取のみ）', desc: '出勤せず給料のみ受取', icon: Wallet, color: 'border-amber-200 hover:border-amber-400' },
   ];
 
   return (
     <UserLayout>
       <div className="mb-4">
-        <h1 className="text-lg font-bold text-gray-900">���フト申請</h1>
+        <h1 className="text-lg font-bold text-gray-900">シフト申請</h1>
         <p className="text-sm text-gray-500">まず申請の種類を選んでください</p>
         {firestoreError && (
           <p className="mt-2 text-xs text-red-600 bg-red-50 px-3 py-2 rounded-lg">{firestoreError}</p>
@@ -199,7 +199,7 @@ export function RequestPage() {
       <Card className="p-5 mb-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
-          {/* 不可��ード */}
+          {/* 不可モード */}
           {mode === 'none' && (
             <div className="sm:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
@@ -210,7 +210,7 @@ export function RequestPage() {
                 <div className="mt-2 flex items-center gap-2 bg-red-50 text-red-700 text-sm px-3 py-2 rounded-lg">
                   <Ban className="w-4 h-4 shrink-0" />
                   <span>
-                    <strong>{formatDateJP(weekRange.start)}（月���〜{formatDateJP(weekRange.end)}（日）</strong> を不可で申請します
+                    <strong>{formatDateJP(weekRange.start)}（月）〜{formatDateJP(weekRange.end)}（日）</strong> を不可で申請します
                   </span>
                 </div>
               )}
@@ -247,7 +247,7 @@ export function RequestPage() {
                 </p>
               </div>
 
-              {/* 時間指定の場合のみ時間���ィールドを表示 */}
+              {/* 時間指定の場合のみ時間フィールドを表示 */}
               {currentOption.hasTime && (
                 <>
                   <div>
@@ -293,7 +293,7 @@ export function RequestPage() {
             onClick={handleSubmit}
             disabled={submitting || (mode === 'apply' && !!dupWarning)}
           >
-            {submitting ? '送信中…' : mode === 'none' ? '週まと���て不��を申請' : '申請を送信'}
+            {submitting ? '送信中…' : mode === 'none' ? '週まとめて不可を申請' : '申請を送信'}
             {!submitting && <CheckCircle2 className="w-4 h-4" />}
           </Button>
         </div>
@@ -301,7 +301,7 @@ export function RequestPage() {
 
       <Card className="p-5">
         <h2 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-1.5">
-          <FilePlus className="w-4 h-4" />最近の自��の申請
+          <FilePlus className="w-4 h-4" />自分の申請一覧
         </h2>
         {myRecent.length === 0 ? (
           <EmptyState icon={<FilePlus className="w-8 h-8" />} title="まだ申請がありません" />
@@ -324,7 +324,7 @@ export function RequestPage() {
                       onClick={() => handleCancel(s.id, s.version, s.subject)}
                       disabled={canceling === s.id}
                       className="text-gray-300 hover:text-red-500 p-1 rounded hover:bg-red-50 transition-colors"
-                      title="申���取消"
+                      title="申請取消"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>

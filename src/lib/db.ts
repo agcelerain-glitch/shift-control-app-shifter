@@ -13,6 +13,7 @@ import {
   deleteDoc,
   runTransaction,
   serverTimestamp,
+  deleteField,
   type Timestamp,
 } from 'firebase/firestore';
 import { db, isFirebaseConfigured, API_BASE_URL } from './firebase';
@@ -315,6 +316,22 @@ export async function updateMemberLineId(memberId: string, lineUserId: string): 
   if (!isFirebaseConfigured || !db) return;
   await setDoc(doc(db, 'members', memberId), {
     lineUserId: lineUserId.trim() || null,
+    updatedAt: serverTimestamp(),
+  }, { merge: true });
+}
+
+// config/lineConfig: LINEグループIDの購読・削除
+export function subscribeLineConfig(cb: (data: { groupId?: string } | null) => void): () => void {
+  if (!isFirebaseConfigured || !db) { cb(null); return () => {}; }
+  return onSnapshot(doc(db!, 'config', 'lineConfig'), (snap) => {
+    cb(snap.exists() ? (snap.data() as { groupId?: string }) : null);
+  }, () => cb(null));
+}
+
+export async function deleteGroupId(): Promise<void> {
+  if (!isFirebaseConfigured || !db) return;
+  await setDoc(doc(db!, 'config', 'lineConfig'), {
+    groupId: deleteField(),
     updatedAt: serverTimestamp(),
   }, { merge: true });
 }

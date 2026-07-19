@@ -1,18 +1,19 @@
-// /admin-line LINE操作: UIとfetchのみ。実処理はVITE_API_BASE_URLのHeroku APIへ投げる
+// /admin-line LINE操作: グループ送信・自分への連絡・個別チャット・GID管理
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { AdminLayout } from '../components/AdminLayout';
 import { useData } from '../contexts/DataContext';
+import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
-import { Card, Button, Textarea, Select } from '../components/ui';
-import { Send, Bell, MessageCircle, Megaphone, Users, Info } from 'lucide-react';
-import { callLineApi } from '../lib/db';
-import { isFirebaseConfigured } from '../lib/firebase';
-import { API_BASE_URL } from '../lib/firebase';
+import { Card, Button, Textarea, Select, Badge } from '../components/ui';
+import { Send, Bell, MessageCircle, Megaphone, Users, Info, Trash2, Wifi, WifiOff } from 'lucide-react';
+import { callLineApi, subscribeLineConfig, deleteGroupId } from '../lib/db';
+import { isFirebaseConfigured, API_BASE_URL } from '../lib/firebase';
 import { formatDateJP, todayStr } from '../lib/utils';
 
 export function AdminLinePage() {
   const { members, shifts } = useData();
+  const { name: adminName } = useAuth();
   const toast = useToast();
   const [sending, setSending] = useState(false);
 
@@ -25,8 +26,23 @@ export function AdminLinePage() {
   // 個別チャット
   const [targetMember, setTargetMember] = useState('');
   const [dmMsg, setDmMsg] = useState('');
+  // GID管理
+  const [groupId, setGroupId] = useState<string | null | undefined>(undefined);
+  const [deletingGid, setDeletingGid] = useState(false);
+
+  // LINEグループID購読
+  useEffect(() => {
+    const unsub = subscribeLineConfig((data) => {
+      setGroupId(data?.groupId ?? null);
+    });
+    return unsub;
+  }, []);
 
   const todayShifts = shifts.filter((s) => s.date === todayStr());
+  const lineMembers = members.filter((m) => m.lineUserId);
+  // admin自身の登録LINE ID
+  const adminMember = members.find((m) => m.name === adminName);
+  const adminLineId = adminMember?.lineUserId;
 
   const send = async (path: string, body: Record<string, unknown>, label: string) => {
     setSending(true);
@@ -40,7 +56,27 @@ export function AdminLinePage() {
     }
   };
 
-  const lineMembers = members.filter((m) => m.lineUserId);
+  const sendSelf = async () => {
+    if (!selfMsg.trim()) return;
+    if (!adminLineId) {
+      toast.show('あなたのLINE IDが未登録です。LINEで「名前登録 ' + (adminName ?? 'お名前') + '」と送信してください。', 'error');
+      return;
+    }
+    await send('/line/dm', { lineUserId: adminLineId, message: selfMsg }, '自分への連絡');
+  };
+
+  const handleDeleteGid = async () => {
+    if (!window.confirm(`GID「${groupId}」を削除しますか？\n削除後はグループで「グループ登録」と送信して再登録してください。`)) return;
+    setDeletingGid(true);
+    try {
+      await deleteGroupId();
+      toast.show('GIDを削除しました', 'success');
+    } catch (e) {
+      toast.show(`削除失敗: ${(e as Error).message}`, 'error');
+    } finally {
+      setDeletingGid(false);
+    }
+  };
 
   return (
     <AdminLayout>
@@ -56,6 +92,35 @@ export function AdminLinePage() {
           </p>
         </Card>
       )}
+
+      {/* GID管理 */}
+      <Card className="p-4 mb-4">
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <div className="flex items-center gap-2">
+            {groupId === undefined ? (
+              <Badge color="blue">読込中…</Badge>
+            ) : groupId ? (
+              <Badge color="confirmed">GID登録済</Badge>
+            ) : (
+              <Badge color="red">GID未登録</Badge>
+            )}
+            <span className="text-xs font-medium text-gray-700">LINEグループID</span>
+            <span className="text-xs font-mono text-gray-500 break-all">
+              {groupId === undefined ? '…' : groupId ?? '—'}
+            </span>
+          </div>
+          {groupId && (
+            <Button size="sm" variant="danger" onClick={handleDeleteGid} disabled={deletingGid}>
+              <Trash2 className="w-3.5 h-3.5" />{deletingGid ? '削除中…' : 'GID削除'}
+            </Button>
+          )}
+        </div>
+        {!groupId && groupId !== undefined && (
+          <p className="text-xs text-gray-400 mt-2">
+            LINEグループに Bot を招待後、グループ内で「グループ登録」と送信してください。
+          </p>
+        )}
+      </Card>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* グループ送信: シフト連絡 */}
@@ -76,7 +141,11 @@ export function AdminLinePage() {
             placeholder="例: 今週のシフトをお知らせします…"
           />
           <div className="mt-3 flex justify-end">
-            <Button onClick={() => send('/line/group/shift', { message: shiftMsg }, 'シフト連絡')} disabled={sending || !shiftMsg.trim()}>
+            <Button
+              onClick={() => send('/line/group/shift', { message: shiftMsg }, 'シフト連絡')}
+              disabled={sending || !shiftMsg.trim() || !groupId}
+              title={!groupId ? 'GIDが未登録です' : undefined}
+            >
               <Send className="w-4 h-4" />送信
             </Button>
           </div>
@@ -103,7 +172,11 @@ export function AdminLinePage() {
           </div>
           <Textarea rows={3} value={positionMsg} onChange={(e) => setPositionMsg(e.target.value)} placeholder="例: 本日の配置: レジ=山田さん、品出し=佐藤さん" />
           <div className="mt-3 flex justify-end">
-            <Button onClick={() => send('/line/group/position', { message: positionMsg, date: todayStr() }, '当日配置')} disabled={sending || !positionMsg.trim()}>
+            <Button
+              onClick={() => send('/line/group/position', { message: positionMsg, date: todayStr() }, '当日配置')}
+              disabled={sending || !positionMsg.trim() || !groupId}
+              title={!groupId ? 'GIDが未登録です' : undefined}
+            >
               <Send className="w-4 h-4" />送信
             </Button>
           </div>
@@ -116,13 +189,22 @@ export function AdminLinePage() {
               <Bell className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="font-semibold text-gray-900">自分への連絡（セルフ通知）</h2>
-              <p className="text-xs text-gray-500">自分宛てにメモ付きで通知</p>
+              <h2 className="font-semibold text-gray-900">
+                自分への連絡
+                <small className="ml-1.5 text-xs font-normal text-gray-400">(admin: {adminName})</small>
+              </h2>
+              <div className="flex items-center gap-1.5 mt-0.5">
+                {adminLineId ? (
+                  <><Wifi className="w-3 h-3 text-green-500" /><p className="text-xs text-green-600">LINE登録済 → 自分のDMへ送信</p></>
+                ) : (
+                  <><WifiOff className="w-3 h-3 text-gray-400" /><p className="text-xs text-gray-400">LINE未登録（LINEで名前登録してください）</p></>
+                )}
+              </div>
             </div>
           </div>
           <Textarea rows={4} value={selfMsg} onChange={(e) => setSelfMsg(e.target.value)} placeholder="自分へのリマインダー…" />
           <div className="mt-3 flex justify-end">
-            <Button onClick={() => send('/line/self', { message: selfMsg }, 'セルフ通知')} disabled={sending || !selfMsg.trim()}>
+            <Button onClick={sendSelf} disabled={sending || !selfMsg.trim() || !adminLineId}>
               <Send className="w-4 h-4" />送信
             </Button>
           </div>
@@ -145,12 +227,19 @@ export function AdminLinePage() {
             {lineMembers.length === 0 ? (
               <option disabled>LINE連携メンバーなし</option>
             ) : (
-              lineMembers.map((m) => <option key={m.id} value={m.lineUserId}>{m.name}</option>)
+              lineMembers.map((m) => (
+                <option key={m.id} value={m.lineUserId!}>
+                  {m.name}{m.name === adminName ? ' (admin)' : ''}
+                </option>
+              ))
             )}
           </Select>
           <Textarea rows={3} value={dmMsg} onChange={(e) => setDmMsg(e.target.value)} placeholder="メッセージ本文…" />
           <div className="mt-3 flex justify-end">
-            <Button onClick={() => send('/line/dm', { lineUserId: targetMember, message: dmMsg }, '個別チャット')} disabled={sending || !targetMember || !dmMsg.trim()}>
+            <Button
+              onClick={() => send('/line/dm', { lineUserId: targetMember, message: dmMsg }, '個別チャット')}
+              disabled={sending || !targetMember || !dmMsg.trim()}
+            >
               <Send className="w-4 h-4" />送信
             </Button>
           </div>

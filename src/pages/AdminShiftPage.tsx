@@ -345,21 +345,12 @@ export function AdminShiftPage() {
                 <p className="text-gray-700 font-medium">{memberInfo ? formatDateTimeJP(memberInfo.updatedAt) : '—'}</p>
               </div>
             </div>
-            {/* LINE ID 表示・手動設定 */}
+            {/* LINE ID 表示 */}
             <div className="mb-3 p-3 rounded-lg bg-gray-50 text-xs">
               <p className="text-gray-400 mb-1">LINE ID</p>
-              <p className="text-gray-600 font-mono break-all mb-2">{memberInfo?.lineUserId ?? '未登録'}</p>
-              <div className="flex gap-2">
-                <Input
-                  value={lineIdDraft}
-                  onChange={(e) => setLineIdDraft(e.target.value)}
-                  placeholder="U000...（手動設定）"
-                  className="text-xs flex-1"
-                />
-                <Button size="sm" variant="secondary" onClick={handleSaveLineId} disabled={savingLineId}>
-                  {savingLineId ? '…' : '保存'}
-                </Button>
-              </div>
+              <p className={`font-mono break-all ${memberInfo?.lineUserId ? 'text-gray-600' : 'text-gray-400 italic'}`}>
+                {memberInfo?.lineUserId ?? '未登録（LINEで「名前登録 お名前」と送信）'}
+              </p>
             </div>
             <p className="text-xs font-medium text-gray-600 mb-2">申請履歴</p>
             <div className="space-y-1.5 max-h-60 overflow-y-auto">

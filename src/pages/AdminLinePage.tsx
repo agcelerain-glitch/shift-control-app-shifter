@@ -44,13 +44,23 @@ export function AdminLinePage() {
   const adminMember = members.find((m) => m.name === adminName);
   const adminLineId = adminMember?.lineUserId;
 
-  const send = async (path: string, body: Record<string, unknown>, label: string) => {
+  const send = async (
+    path: string,
+    body: Record<string, unknown>,
+    label: string,
+    onSuccess?: () => void,
+  ) => {
     setSending(true);
     try {
       const res = await callLineApi(path, body);
-      toast.show(res.ok ? `${label}: ${res.message}` : `${label}失敗: ${res.message}`, res.ok ? 'success' : 'error');
+      if (res.ok) {
+        toast.show(`${label}: ${res.message}`, 'success');
+        onSuccess?.();
+      } else {
+        toast.show(`${label}失敗: ${res.message}`, 'error');
+      }
     } catch {
-      toast.show(`${label}失敗`, 'error');
+      toast.show(`${label}失敗（通信エラー）`, 'error');
     } finally {
       setSending(false);
     }
@@ -140,9 +150,10 @@ export function AdminLinePage() {
             onChange={(e) => setShiftMsg(e.target.value)}
             placeholder="例: 今週のシフトをお知らせします…"
           />
-          <div className="mt-3 flex justify-end">
+          <p className="text-[10px] text-gray-400 mt-1.5">送信失敗時は内容を非公開メモに保存してください</p>
+          <div className="mt-2 flex justify-end">
             <Button
-              onClick={() => send('/line/group/shift', { message: shiftMsg }, 'シフト連絡')}
+              onClick={() => send('/line/group/shift', { message: shiftMsg }, 'シフト連絡', () => setShiftMsg(''))}
               disabled={sending || !shiftMsg.trim() || !groupId}
               title={!groupId ? 'GIDが未登録です' : undefined}
             >
@@ -171,9 +182,10 @@ export function AdminLinePage() {
             )}
           </div>
           <Textarea rows={3} value={positionMsg} onChange={(e) => setPositionMsg(e.target.value)} placeholder="例: 本日の配置: レジ=山田さん、品出し=佐藤さん" />
-          <div className="mt-3 flex justify-end">
+          <p className="text-[10px] text-gray-400 mt-1.5">送信失敗時は内容を非公開メモに保存してください</p>
+          <div className="mt-2 flex justify-end">
             <Button
-              onClick={() => send('/line/group/position', { message: positionMsg, date: todayStr() }, '当日配置')}
+              onClick={() => send('/line/group/position', { message: positionMsg, date: todayStr() }, '当日配置', () => setPositionMsg(''))}
               disabled={sending || !positionMsg.trim() || !groupId}
               title={!groupId ? 'GIDが未登録です' : undefined}
             >
@@ -203,7 +215,8 @@ export function AdminLinePage() {
             </div>
           </div>
           <Textarea rows={4} value={selfMsg} onChange={(e) => setSelfMsg(e.target.value)} placeholder="自分へのリマインダー…" />
-          <div className="mt-3 flex justify-end">
+          <p className="text-[10px] text-gray-400 mt-1.5">送信失敗時は内容を非公開メモに保存してください</p>
+          <div className="mt-2 flex justify-end">
             <Button onClick={sendSelf} disabled={sending || !selfMsg.trim() || !adminLineId}>
               <Send className="w-4 h-4" />送信
             </Button>

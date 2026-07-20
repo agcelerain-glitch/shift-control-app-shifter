@@ -1,10 +1,16 @@
 // 共通データ型定義: FirestoreモデルとUI間で共有する型
+// 表示用定数（TEMPLATE_LABELS / PLACE_OPTIONS 等）は lib/config.ts を参照・編集
+
+// TemplateCode は config.ts で定義（後方互換のため再エクスポート）
+export type { TemplateCode } from './config';
+export { TEMPLATE_LABELS, TEMPLATE_TIMES } from './config';
+
+import type { TemplateCode } from './config';
 
 export type Role = 'user' | 'admin';
 
 export type ShiftStatus = 'plan' | 'confirmed' | 'reviewed';
 export type TimeType = 'none' | 'time' | 'template' | 'other';
-export type TemplateCode = 'A' | 'B' | 'C' | 'D';
 
 // members: 名簿
 export interface Member {
@@ -60,17 +66,3 @@ export interface ApprovalLog {
   adminName: string;
   createdAt: number;
 }
-
-export const TEMPLATE_LABELS: Record<TemplateCode, string> = {
-  A: 'A帯',
-  B: 'B帯',
-  C: 'C帯',
-  D: 'D帯',
-};
-
-export const TEMPLATE_TIMES: Record<TemplateCode, { start: string; end: string }> = {
-  A: { start: '09:00', end: '13:00' },
-  B: { start: '13:00', end: '17:00' },
-  C: { start: '17:00', end: '21:00' },
-  D: { start: '21:00', end: '25:00' },
-};

@@ -9,19 +9,11 @@ import { Card, Button, Input, Select, Badge, EmptyState } from '../components/ui
 import { FilePlus, Ban, Clock, Wallet, CheckCircle2, AlertTriangle, Trash2 } from 'lucide-react';
 import { formatDateJP, weekdayJP } from '../lib/utils';
 import { createShift, findShiftByMemberDate, cancelShift } from '../lib/db';
-import { TEMPLATE_LABELS } from '../lib/types';
-import type { TemplateCode } from '../lib/types';
+import { PLACE_OPTIONS, SUBJECT_OPTIONS, TEMPLATE_LABELS } from '../lib/config';
+import type { TemplateCode } from '../lib/config';
 
 type Mode = 'none' | 'apply' | 'other';
 type SubjectMode = TemplateCode | 'time';
-
-const SUBJECT_OPTIONS: { value: SubjectMode; label: string; hasTime: boolean }[] = [
-  { value: 'A', label: 'A帯', hasTime: false },
-  { value: 'B', label: 'B帯', hasTime: false },
-  { value: 'C', label: 'C帯', hasTime: false },
-  { value: 'D', label: 'D帯', hasTime: false },
-  { value: 'time', label: '時間指定', hasTime: true },
-];
 
 // 15分刻みの時刻リスト 00:00〜23:45
 const TIME_OPTIONS: string[] = [];
@@ -267,7 +259,10 @@ export function RequestPage() {
 
               <div className={currentOption.hasTime ? '' : 'sm:col-span-2'}>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">場所（任意）</label>
-                <Input value={place} onChange={(e) => setPlace(e.target.value)} placeholder="例: 本店" />
+                <Select value={place} onChange={(e) => setPlace(e.target.value)}>
+                  <option value="">指定なし</option>
+                  {PLACE_OPTIONS.map((p) => <option key={p} value={p}>{p}</option>)}
+                </Select>
               </div>
             </>
           )}

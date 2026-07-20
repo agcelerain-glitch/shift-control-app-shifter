@@ -313,11 +313,7 @@ export function AdminLinePage() {
         </Card>
       </div>
 
-      <Card className="p-4 mt-4">
-        <p className="text-xs text-gray-400 flex items-center gap-1.5">
-          <Info className="w-3.5 h-3.5" />トークン等の秘匿情報はフロントに置かず、Heroku側のAPIで取り扱います。フロントは fetch でエンドポイントを呼ぶだけです。
-        </p>
-      </Card>
+      {/* [開発者メモ] トークン等の秘匿情報はフロントに置かず、Heroku側のAPIで取り扱います。フロントは fetch でエンドポイントを呼ぶだけです。 */}
 
       {/* 全体シフトカレンダー */}
       <div className="mt-6">

@@ -11,14 +11,12 @@ import {
   CalendarDays, Calendar, Hash, ChevronDown, ChevronRight, History, Trash2, Plus, Minus,
 } from 'lucide-react';
 import { formatDateJP, formatDateTimeJP, isPast7Days, weekdayJP, todayStr } from '../lib/utils';
-import { TEMPLATE_LABELS } from '../lib/types';
+import { PLACE_OPTIONS, TEMPLATE_LABELS } from '../lib/config';
 import type { Shift, ApprovalLog } from '../lib/types';
 import { approveShift, restoreShift, updateMemberLineId, deleteMember } from '../lib/db';
 
 type SortKey = 'date' | 'place' | 'time' | 'name' | 'weekday' | 'headcount';
 type FilterStatus = 'plan' | 'confirmed' | 'reviewed' | 'unavailable';
-
-const PLACE_OPTIONS = ['本店', '支店A', '支店B', '倉庫'] as const;
 
 function timeLabelOf(s: Shift): string {
   if (s.timeType === 'template' && s.template) return TEMPLATE_LABELS[s.template];
@@ -63,6 +61,37 @@ export function AdminShiftPage() {
   const [savingLineId, setSavingLineId] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deletingMember, setDeletingMember] = useState(false);
+
+  // 承認時の場所指定モーダル
+  const [approvingShift, setApprovingShift] = useState<Shift | null>(null);
+  const [approvePlace, setApprovePlace] = useState('');
+
+  const openApprove = (s: Shift) => {
+    setApprovingShift(s);
+    setApprovePlace(s.place ?? '');
+  };
+
+  const confirmApprove = async () => {
+    if (!approvingShift) return;
+    const s = approvingShift;
+    try {
+      const res = await approveShift({
+        shiftId: s.id,
+        action: approvePlace ? 'adjust' : 'approve',
+        adminName,
+        expectedVersion: s.version,
+        ...(approvePlace ? { adjustFields: { place: approvePlace } } : {}),
+      });
+      if (res === 'ok') {
+        toast.show(`${s.memberName}さんのシフトを確定しました`, 'success');
+        setApprovingShift(null);
+      } else if (res === 'conflict') {
+        toast.show('競合: 画面を更新してください', 'error');
+      }
+    } catch (e) {
+      toast.show(`承認エラー: ${(e as Error).message}`, 'error');
+    }
+  };
 
   // 調整モーダルのフィールド
   const [adjTimeStart, setAdjTimeStart] = useState('');
@@ -122,16 +151,6 @@ export function AdminShiftPage() {
       };
     });
   }, [shifts, today]);
-
-  const doApprove = async (s: Shift) => {
-    try {
-      const res = await approveShift({ shiftId: s.id, action: 'approve', adminName, expectedVersion: s.version });
-      if (res === 'ok') toast.show(`${s.memberName}さんのシフトを確定しました`, 'success');
-      else if (res === 'conflict') toast.show('競合: 最新データを再取得してください（画面を更新）', 'error');
-    } catch (e) {
-      toast.show(`承認エラー: ${(e as Error).message}`, 'error');
-    }
-  };
 
   const doDeny = async (s: Shift) => {
     try {
@@ -340,7 +359,7 @@ export function AdminShiftPage() {
                       <>
                         {s.status === 'plan' && (
                           <>
-                            <Button size="sm" variant="success" onClick={() => doApprove(s)}><CheckCircle2 className="w-4 h-4" />許可</Button>
+                            <Button size="sm" variant="success" onClick={() => openApprove(s)}><CheckCircle2 className="w-4 h-4" />許可</Button>
                             <Button size="sm" variant="danger" onClick={() => doDeny(s)}><XCircle className="w-4 h-4" />否認</Button>
                             <Button size="sm" variant="secondary" onClick={() => openAdjust(s)}><Sliders className="w-4 h-4" />調整</Button>
                           </>
@@ -350,7 +369,7 @@ export function AdminShiftPage() {
                         )}
                         {s.status === 'reviewed' && (
                           <>
-                            <Button size="sm" variant="success" onClick={() => doApprove(s)}><CheckCircle2 className="w-4 h-4" />許可</Button>
+                            <Button size="sm" variant="success" onClick={() => openApprove(s)}><CheckCircle2 className="w-4 h-4" />許可</Button>
                             <Button size="sm" variant="secondary" onClick={() => openAdjust(s)}><Sliders className="w-4 h-4" />調整</Button>
                           </>
                         )}
@@ -363,6 +382,38 @@ export function AdminShiftPage() {
           })}
         </div>
       )}
+
+      {/* 承認確認モーダル: 場所指定 */}
+      <Modal
+        open={approvingShift !== null}
+        onClose={() => setApprovingShift(null)}
+        title="承認確認"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setApprovingShift(null)}>キャンセル</Button>
+            <Button variant="success" onClick={confirmApprove}>
+              <CheckCircle2 className="w-4 h-4" />確定する
+            </Button>
+          </>
+        }
+      >
+        {approvingShift && (
+          <div className="space-y-4">
+            <div className="bg-gray-50 rounded-xl p-3">
+              <p className="text-sm font-medium text-gray-900">{approvingShift.memberName}</p>
+              <p className="text-sm text-gray-600">{formatDateJP(approvingShift.date)} · {approvingShift.subject}</p>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5">場所を指定</label>
+              <Select value={approvePlace} onChange={(e) => setApprovePlace(e.target.value)}>
+                <option value="">指定なし</option>
+                {PLACE_OPTIONS.map((p) => <option key={p} value={p}>{p}</option>)}
+              </Select>
+              <p className="text-xs text-gray-400 mt-1">省略した場合は場所なしで確定します</p>
+            </div>
+          </div>
+        )}
+      </Modal>
 
       {/* 調整モーダル */}
       <Modal

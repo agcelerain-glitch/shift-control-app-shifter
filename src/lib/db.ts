@@ -153,7 +153,7 @@ export async function cancelShift(shiftId: string, expectedVersion: number): Pro
       const snap = await tx.get(shiftRef);
       if (!snap.exists()) throw new Error('not found');
       const data = snap.data() as Record<string, unknown>;
-      if (data.status === 'confirmed') throw new Error('FORBIDDEN');
+      if (data.status === 'confirmed' || data.status === 'delete_requested') throw new Error('FORBIDDEN');
       if ((data.version as number) !== expectedVersion) throw new Error('CONFLICT');
       tx.delete(shiftRef);
     });
@@ -164,6 +164,39 @@ export async function cancelShift(shiftId: string, expectedVersion: number): Pro
     if (msg === 'FORBIDDEN') return 'forbidden';
     throw e;
   }
+}
+
+// ユーザーが確定シフトの削除を申請（status = delete_requested に変更）
+export async function requestDeleteShift(shiftId: string, expectedVersion: number): Promise<'ok' | 'conflict'> {
+  if (!isFirebaseConfigured) return mockStore.requestDeleteShift(shiftId, expectedVersion);
+  const shiftRef = doc(db!, 'shifts', shiftId);
+  try {
+    await runTransaction(db!, async (tx) => {
+      const snap = await tx.get(shiftRef);
+      if (!snap.exists()) throw new Error('not found');
+      const data = snap.data() as Record<string, unknown>;
+      if ((data.version as number) !== expectedVersion) throw new Error('CONFLICT');
+      tx.set(shiftRef, {
+        status: 'delete_requested' as ShiftStatus,
+        updatedAt: serverTimestamp(),
+        version: ((data.version as number) ?? 1) + 1,
+      }, { merge: true });
+    });
+    return 'ok';
+  } catch (e) {
+    const msg = (e as Error).message;
+    if (msg === 'CONFLICT') return 'conflict';
+    throw e;
+  }
+}
+
+// admin: シフトをDBから完全削除（再申請可能になる）
+export async function adminDeleteShift(shiftId: string): Promise<void> {
+  if (!isFirebaseConfigured) {
+    mockStore.deleteShift(shiftId);
+    return;
+  }
+  await deleteDoc(doc(db!, 'shifts', shiftId));
 }
 
 // ---- トランザクションで安全に承認/否認/調整（version楽観ロック） ----

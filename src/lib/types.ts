@@ -9,7 +9,7 @@ import type { TemplateCode } from './config';
 
 export type Role = 'user' | 'admin';
 
-export type ShiftStatus = 'plan' | 'confirmed' | 'reviewed';
+export type ShiftStatus = 'plan' | 'confirmed' | 'reviewed' | 'delete_requested';
 export type TimeType = 'none' | 'time' | 'template' | 'other';
 
 // members: 名簿

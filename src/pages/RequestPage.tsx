@@ -217,7 +217,7 @@ export function RequestPage() {
                 <Input type="date" value={date} onChange={(e) => checkDup(e.target.value)} />
                 {date && (
                   <p className={`text-xs mt-1 ${weekdayJP(date) === '日' ? 'text-red-500' : weekdayJP(date) === '土' ? 'text-blue-500' : 'text-gray-500'}`}>
-                    {formatDateJP(date)}（{weekdayJP(date)}）
+                    {formatDateJP(date)}
                   </p>
                 )}
                 {dupWarning && (
@@ -274,7 +274,7 @@ export function RequestPage() {
               <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
               {date && (
                 <p className={`text-xs mt-1 ${weekdayJP(date) === '日' ? 'text-red-500' : weekdayJP(date) === '土' ? 'text-blue-500' : 'text-gray-500'}`}>
-                  {formatDateJP(date)}（{weekdayJP(date)}）
+                  {formatDateJP(date)}
                 </p>
               )}
             </div>

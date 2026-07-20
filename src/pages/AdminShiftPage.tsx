@@ -13,10 +13,10 @@ import {
 import { formatDateJP, formatDateTimeJP, isPast7Days, weekdayJP, todayStr } from '../lib/utils';
 import { PLACE_OPTIONS, TEMPLATE_LABELS } from '../lib/config';
 import type { Shift, ApprovalLog } from '../lib/types';
-import { approveShift, restoreShift, updateMemberLineId, deleteMember } from '../lib/db';
+import { approveShift, restoreShift, updateMemberLineId, deleteMember, adminDeleteShift } from '../lib/db';
 
 type SortKey = 'date' | 'place' | 'time' | 'name' | 'weekday' | 'headcount';
-type FilterStatus = 'plan' | 'confirmed' | 'reviewed' | 'unavailable';
+type FilterStatus = 'plan' | 'confirmed' | 'reviewed' | 'unavailable' | 'delete_request';
 
 function timeLabelOf(s: Shift): string {
   if (s.timeType === 'template' && s.template) return TEMPLATE_LABELS[s.template];
@@ -32,6 +32,7 @@ function timeSortVal(s: Shift): number {
 
 function statusBadge(s: Shift) {
   if (s.timeType === 'none') return <Badge color="gray">不可</Badge>;
+  if (s.status === 'delete_requested') return <Badge color="red">削除依頼</Badge>;
   if (s.status === 'confirmed') return <Badge color="confirmed">確定</Badge>;
   if (s.status === 'reviewed') return <Badge color="reviewed">確認済</Badge>;
   return <Badge color="plan">予定</Badge>;
@@ -104,6 +105,7 @@ export function AdminShiftPage() {
     let list = shifts.filter((s) => {
       const isUnavail = s.timeType === 'none';
       if (isUnavail) return activeFilters.has('unavailable');
+      if (s.status === 'delete_requested') return activeFilters.has('delete_request');
       if (s.status === 'plan') return activeFilters.has('plan');
       if (s.status === 'confirmed') return activeFilters.has('confirmed');
       if (s.status === 'reviewed') return activeFilters.has('reviewed');
@@ -128,6 +130,7 @@ export function AdminShiftPage() {
 
   const planCount = shifts.filter((s) => s.status === 'plan' && s.timeType !== 'none').length;
   const unavailCount = shifts.filter((s) => s.timeType === 'none' && s.status === 'plan').length;
+  const deleteReqCount = shifts.filter((s) => s.status === 'delete_requested').length;
 
   // 本日から7日間の日ごとシフト集計
   const today = todayStr();
@@ -151,6 +154,16 @@ export function AdminShiftPage() {
       };
     });
   }, [shifts, today]);
+
+  const doAdminDelete = async (s: Shift) => {
+    if (!window.confirm(`${s.memberName}さんの「${formatDateJP(s.date)} ${s.subject}」を完全削除しますか？\nこの操作は取り消せません。`)) return;
+    try {
+      await adminDeleteShift(s.id);
+      toast.show(`${s.memberName}さんのシフトを削除しました`, 'success');
+    } catch (e) {
+      toast.show(`削除エラー: ${(e as Error).message}`, 'error');
+    }
+  };
 
   const doDeny = async (s: Shift) => {
     try {
@@ -251,6 +264,7 @@ export function AdminShiftPage() {
             申請の許可・否認・調整を行います
             {planCount > 0 && <span className="text-amber-600 font-medium ml-1">未処理 {planCount}件</span>}
             {unavailCount > 0 && <span className="text-slate-500 font-medium ml-1">不可 {unavailCount}件</span>}
+            {deleteReqCount > 0 && <span className="text-rose-600 font-medium ml-1">削除依頼 {deleteReqCount}件</span>}
           </p>
         </div>
         <div className="flex gap-2">
@@ -305,6 +319,7 @@ export function AdminShiftPage() {
             { id: 'confirmed', label: '確定', activeClass: 'border-green-500 bg-green-50 text-green-700' },
             { id: 'reviewed', label: '確認済', activeClass: 'border-gray-400 bg-gray-100 text-gray-600' },
             { id: 'unavailable', label: '不可', activeClass: 'border-slate-500 bg-slate-100 text-slate-600' },
+            { id: 'delete_request', label: '削除依頼', activeClass: 'border-rose-500 bg-rose-50 text-rose-700' },
           ] as const).map((f) => (
             <button
               key={f.id}
@@ -350,7 +365,11 @@ export function AdminShiftPage() {
                     <p className="text-[10px] text-gray-400 mt-1">申請 {formatDateTimeJP(s.createdAt)} / 修正 {formatDateTimeJP(s.updatedAt)} / v{s.version}</p>
                   </div>
                   <div className="flex gap-1.5 shrink-0 flex-wrap">
-                    {s.timeType === 'none' ? (
+                    {s.status === 'delete_requested' ? (
+                      <Button size="sm" variant="danger" onClick={() => doAdminDelete(s)}>
+                        <Trash2 className="w-4 h-4" />削除する
+                      </Button>
+                    ) : s.timeType === 'none' ? (
                       // 不可申請: 確認のみ（承認・調整は不要）
                       s.status === 'plan' && (
                         <Button size="sm" variant="secondary" onClick={() => doDeny(s)}><CheckCircle2 className="w-4 h-4" />確認済に</Button>

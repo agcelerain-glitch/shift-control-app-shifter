@@ -171,7 +171,23 @@ export const mockStore = {
     notify('boardPublic');
   },
 
-  deleteDoc(key: 'boardPublic' | 'boardPrivate', id: string) {
+  requestDeleteShift(shiftId: string, expectedVersion: number): 'ok' | 'conflict' {
+    const s = state.shifts.find((x) => x.id === shiftId);
+    if (!s) return 'conflict';
+    if (s.version !== expectedVersion) return 'conflict';
+    s.status = 'delete_requested' as ShiftStatus;
+    s.version += 1;
+    s.updatedAt = Date.now();
+    notify('shifts');
+    return 'ok';
+  },
+
+  deleteShift(shiftId: string) {
+    state.shifts = state.shifts.filter((s) => s.id !== shiftId);
+    notify('shifts');
+  },
+
+  deleteDoc(key: 'boardPublic' | 'boardPrivate' | 'shifts', id: string) {
     state[key] = state[key].filter((x) => x.id !== id) as never;
     notify(key);
   },

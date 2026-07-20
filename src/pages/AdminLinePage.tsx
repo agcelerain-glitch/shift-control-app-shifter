@@ -116,7 +116,7 @@ export function AdminLinePage() {
     <AdminLayout>
       <div className="mb-4">
         <h1 className="text-lg font-bold text-gray-900">LINE操作</h1>
-        <p className="text-sm text-gray-500">バックエンドAPI（Heroku）へ送信します</p>
+        {/* バックエンドAPI（Heroku）へ送信します */}
       </div>
 
       {!API_BASE_URL && !isFirebaseConfigured && (

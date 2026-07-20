@@ -1,4 +1,4 @@
-// 月表示カレンダー: 全ユーザーのシフトを重ねて表示、予定/確定/当日/確認済を配色で区別
+// 月表示カレンダー: 全ユーザーのシフトを重ねて表示、予定/確定/当日/確認済/不可を配色で区別
 
 import { useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
@@ -18,6 +18,10 @@ export interface MemberColor {
 }
 
 function getShiftStyle(s: Shift, mc: MemberColor | undefined): { style?: React.CSSProperties; cls: string } {
+  // 不可（シフトなし）: グレー表示、取り消し線なし
+  if (s.timeType === 'none') {
+    return { cls: 'text-[10px] leading-tight px-1 py-0.5 rounded truncate bg-gray-100 text-gray-400' };
+  }
   if (mc) {
     const bg =
       s.status === 'confirmed' ? mc.confirmedBg :
@@ -54,11 +58,13 @@ export function MonthCalendar({
   const grid = useMemo(() => getMonthGrid(cursor.y, cursor.m), [cursor]);
   const byDate = useMemo(() => {
     const map: Record<string, Shift[]> = {};
-    shifts.forEach((s) => {
-      (map[s.date] ??= []).push(s);
-    });
+    shifts.forEach((s) => { (map[s.date] ??= []).push(s); });
     return map;
   }, [shifts]);
+
+  const hasUnavailable = useMemo(() => shifts.some((s) => s.timeType === 'none'), [shifts]);
+  const hasPlan      = useMemo(() => shifts.some((s) => s.status === 'plan' && s.timeType !== 'none'), [shifts]);
+  const hasReviewed  = useMemo(() => shifts.some((s) => s.status === 'reviewed'), [shifts]);
 
   const move = (delta: number) => {
     setCursor((c) => {
@@ -116,7 +122,11 @@ export function MonthCalendar({
               </div>
               <div className="space-y-0.5">
                 {dayShifts.slice(0, 3).map((s) => {
+                  const isUnavailable = s.timeType === 'none';
                   const { style, cls } = getShiftStyle(s, memberColors?.[s.memberName]);
+                  const label = isUnavailable
+                    ? `${s.memberName.split(' ')[0]} 不可`
+                    : `${s.memberName.split(' ')[0]}・${s.subject}`;
                   return (
                     <div
                       key={s.id}
@@ -124,7 +134,7 @@ export function MonthCalendar({
                       style={style}
                       title={`${s.memberName} ${s.subject}`}
                     >
-                      {s.memberName.split(' ')[0]}・{s.subject}
+                      {label}
                     </div>
                   );
                 })}
@@ -138,16 +148,16 @@ export function MonthCalendar({
         })}
       </div>
 
-      <div className="flex items-center gap-4 px-4 py-3 border-t border-gray-100 bg-gray-50 text-xs flex-wrap">
-        <span className="flex items-center gap-1.5">
-          <Badge color="confirmed">確定</Badge>
-        </span>
-        <span className="flex items-center gap-1.5">
-          <Badge color="plan">予定</Badge>
-        </span>
-        <span className="flex items-center gap-1.5">
-          <Badge color="reviewed">確認済</Badge>
-        </span>
+      {/* 凡例: 表示されているステータスのみ動的に表示 */}
+      <div className="flex items-center gap-3 px-4 py-3 border-t border-gray-100 bg-gray-50 text-xs flex-wrap">
+        <span className="flex items-center gap-1.5"><Badge color="confirmed">確定</Badge></span>
+        {hasPlan && <span className="flex items-center gap-1.5"><Badge color="plan">予定</Badge></span>}
+        {hasReviewed && <span className="flex items-center gap-1.5"><Badge color="reviewed">確認済</Badge></span>}
+        {hasUnavailable && (
+          <span className="flex items-center gap-1.5">
+            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-400">不可</span>
+          </span>
+        )}
         <span className="flex items-center gap-1.5">
           <span className="inline-block w-3 h-3 rounded-full ring-2 ring-today-ring" />
           <span className="text-gray-500">当日</span>
@@ -165,18 +175,25 @@ export function DayShiftList({ date, shifts }: { date: string; shifts: Shift[] }
       {shifts.length === 0 ? (
         <p className="text-sm text-gray-400">この日のシフトはありません</p>
       ) : (
-        shifts.map((s) => (
-          <div key={s.id} className="flex items-start gap-2 p-3 rounded-lg bg-gray-50">
-            <Badge color={s.status === 'confirmed' ? 'confirmed' : s.status === 'reviewed' ? 'reviewed' : 'plan'}>
-              {s.status === 'confirmed' ? '確定' : s.status === 'reviewed' ? '確認済' : '予定'}
-            </Badge>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-gray-900">{s.memberName}</p>
-              <p className="text-sm text-gray-600">{s.subject}</p>
-              {s.place && <p className="text-xs text-gray-500">場所: {s.place}</p>}
+        shifts.map((s) => {
+          const isUnavailable = s.timeType === 'none';
+          return (
+            <div key={s.id} className="flex items-start gap-2 p-3 rounded-lg bg-gray-50">
+              <Badge color={
+                isUnavailable ? 'gray' :
+                s.status === 'confirmed' ? 'confirmed' :
+                s.status === 'reviewed'  ? 'reviewed'  : 'plan'
+              }>
+                {isUnavailable ? '不可' : s.status === 'confirmed' ? '確定' : s.status === 'reviewed' ? '確認済' : '予定'}
+              </Badge>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-900">{s.memberName}</p>
+                {!isUnavailable && <p className="text-sm text-gray-600">{s.subject}</p>}
+                {s.place && <p className="text-xs text-gray-500">場所: {s.place}</p>}
+              </div>
             </div>
-          </div>
-        ))
+          );
+        })
       )}
     </div>
   );

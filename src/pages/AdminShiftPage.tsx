@@ -16,6 +16,7 @@ import type { Shift, ApprovalLog } from '../lib/types';
 import { approveShift, restoreShift, updateMemberLineId, deleteMember } from '../lib/db';
 
 type SortKey = 'date' | 'place' | 'time' | 'name' | 'weekday' | 'headcount';
+type FilterStatus = 'plan' | 'confirmed' | 'reviewed' | 'unavailable';
 
 const PLACE_OPTIONS = ['本店', '支店A', '支店B', '倉庫'] as const;
 
@@ -32,6 +33,7 @@ function timeSortVal(s: Shift): number {
 }
 
 function statusBadge(s: Shift) {
+  if (s.timeType === 'none') return <Badge color="gray">不可</Badge>;
   if (s.status === 'confirmed') return <Badge color="confirmed">確定</Badge>;
   if (s.status === 'reviewed') return <Badge color="reviewed">確認済</Badge>;
   return <Badge color="plan">予定</Badge>;
@@ -43,7 +45,15 @@ export function AdminShiftPage() {
   const adminName = name ?? '管理者';
   const toast = useToast();
   const [sortKey, setSortKey] = useState<SortKey>('date');
-  const [filter, setFilter] = useState<'all' | 'plan' | 'confirmed' | 'reviewed'>('plan');
+  const [activeFilters, setActiveFilters] = useState<Set<FilterStatus>>(new Set(['plan']));
+
+  const toggleFilter = (f: FilterStatus) => {
+    setActiveFilters((prev) => {
+      const next = new Set(prev);
+      if (next.has(f)) next.delete(f); else next.add(f);
+      return next;
+    });
+  };
   const [search, setSearch] = useState('');
   const [adjusting, setAdjusting] = useState<Shift | null>(null);
   const [membersOpen, setMembersOpen] = useState(false);
@@ -62,10 +72,14 @@ export function AdminShiftPage() {
   const [adjAddTime, setAdjAddTime] = useState(false);
 
   const filtered = useMemo(() => {
-    let list = shifts;
-    if (filter === 'plan') list = list.filter((s) => s.status === 'plan');
-    if (filter === 'confirmed') list = list.filter((s) => s.status === 'confirmed');
-    if (filter === 'reviewed') list = list.filter((s) => s.status === 'reviewed');
+    let list = shifts.filter((s) => {
+      const isUnavail = s.timeType === 'none';
+      if (isUnavail) return activeFilters.has('unavailable');
+      if (s.status === 'plan') return activeFilters.has('plan');
+      if (s.status === 'confirmed') return activeFilters.has('confirmed');
+      if (s.status === 'reviewed') return activeFilters.has('reviewed');
+      return false;
+    });
     if (search.trim()) {
       const q = search.trim().toLowerCase();
       list = list.filter((s) => s.memberName.toLowerCase().includes(q) || s.subject.toLowerCase().includes(q) || (s.place ?? '').toLowerCase().includes(q));
@@ -81,9 +95,10 @@ export function AdminShiftPage() {
       }
     });
     return sorted;
-  }, [shifts, filter, search, sortKey]);
+  }, [shifts, activeFilters, search, sortKey]);
 
-  const planCount = shifts.filter((s) => s.status === 'plan').length;
+  const planCount = shifts.filter((s) => s.status === 'plan' && s.timeType !== 'none').length;
+  const unavailCount = shifts.filter((s) => s.timeType === 'none' && s.status === 'plan').length;
 
   // 本日から7日間の日ごとシフト集計
   const today = todayStr();
@@ -101,8 +116,9 @@ export function AdminShiftPage() {
         isSun: d.getDay() === 0,
         isSat: d.getDay() === 6,
         confirmed: dayShifts.filter((s) => s.status === 'confirmed').length,
-        plan: dayShifts.filter((s) => s.status === 'plan').length,
+        plan: dayShifts.filter((s) => s.status === 'plan' && s.timeType !== 'none').length,
         reviewed: dayShifts.filter((s) => s.status === 'reviewed').length,
+        unavailable: dayShifts.filter((s) => s.timeType === 'none').length,
       };
     });
   }, [shifts, today]);
@@ -212,7 +228,11 @@ export function AdminShiftPage() {
       <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
         <div>
           <h1 className="text-lg font-bold text-gray-900">シフト調整</h1>
-          <p className="text-sm text-gray-500">申請の許可・否認・調整を行います {planCount > 0 && <span className="text-amber-600 font-medium">未処理 {planCount}件</span>}</p>
+          <p className="text-sm text-gray-500">
+            申請の許可・否認・調整を行います
+            {planCount > 0 && <span className="text-amber-600 font-medium ml-1">未処理 {planCount}件</span>}
+            {unavailCount > 0 && <span className="text-slate-500 font-medium ml-1">不可 {unavailCount}件</span>}
+          </p>
         </div>
         <div className="flex gap-2">
           <Button variant="secondary" size="sm" onClick={() => setMembersOpen(true)}>
@@ -228,7 +248,7 @@ export function AdminShiftPage() {
       <Card className="p-3 mb-4 overflow-x-auto">
         <p className="text-xs font-medium text-gray-500 mb-2">今後7日間の人数</p>
         <div className="flex gap-2 min-w-max">
-          {weekSummary.map(({ date, wd, day, isToday, isSun, isSat, confirmed, plan, reviewed }) => (
+          {weekSummary.map(({ date, wd, day, isToday, isSun, isSat, confirmed, plan, reviewed, unavailable }) => (
             <div key={date} className={`flex flex-col items-center px-3 py-2 rounded-xl min-w-[52px] ${isToday ? 'bg-brand-50 ring-1 ring-brand-300' : 'bg-gray-50'}`}>
               <span className={`text-[10px] font-medium ${isSun ? 'text-red-500' : isSat ? 'text-blue-500' : 'text-gray-500'}`}>{wd}</span>
               <span className={`text-sm font-bold ${isToday ? 'text-brand-700' : 'text-gray-800'}`}>{day}</span>
@@ -236,7 +256,8 @@ export function AdminShiftPage() {
                 {confirmed > 0 && <div className="bg-confirmed-soft text-confirmed-strong rounded px-1">確{confirmed}</div>}
                 {plan > 0 && <div className="bg-plan-soft text-plan-strong rounded px-1">予{plan}</div>}
                 {reviewed > 0 && <div className="bg-gray-100 text-gray-400 rounded px-1">済{reviewed}</div>}
-                {confirmed === 0 && plan === 0 && reviewed === 0 && <div className="text-gray-300">—</div>}
+                {unavailable > 0 && <div className="bg-slate-100 text-slate-500 rounded px-1">不{unavailable}</div>}
+                {confirmed === 0 && plan === 0 && reviewed === 0 && unavailable === 0 && <div className="text-gray-300">—</div>}
               </div>
             </div>
           ))}
@@ -259,15 +280,25 @@ export function AdminShiftPage() {
             ))}
           </div>
         </div>
-        <div className="flex gap-2 flex-wrap">
-          <Select value={filter} onChange={(e) => setFilter(e.target.value as typeof filter)} className="w-auto">
-            <option value="plan">予定のみ</option>
-            <option value="confirmed">確定のみ</option>
-            <option value="reviewed">確認済（否認）</option>
-            <option value="all">すべて</option>
-          </Select>
-          <Input placeholder="名前・件名・場所で検索" value={search} onChange={(e) => setSearch(e.target.value)} className="flex-1 min-w-[160px]" />
+        <div className="flex gap-1.5 flex-wrap mb-2">
+          {([
+            { id: 'plan', label: '予定', activeClass: 'border-amber-400 bg-amber-50 text-amber-700' },
+            { id: 'confirmed', label: '確定', activeClass: 'border-green-500 bg-green-50 text-green-700' },
+            { id: 'reviewed', label: '確認済', activeClass: 'border-gray-400 bg-gray-100 text-gray-600' },
+            { id: 'unavailable', label: '不可', activeClass: 'border-slate-500 bg-slate-100 text-slate-600' },
+          ] as const).map((f) => (
+            <button
+              key={f.id}
+              onClick={() => toggleFilter(f.id)}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium border-2 transition-all ${
+                activeFilters.has(f.id) ? f.activeClass : 'border-gray-200 bg-white text-gray-400'
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
         </div>
+        <Input placeholder="名前・件名・場所で検索" value={search} onChange={(e) => setSearch(e.target.value)} />
       </Card>
 
       {/* シフト一覧 */}
@@ -300,20 +331,29 @@ export function AdminShiftPage() {
                     <p className="text-[10px] text-gray-400 mt-1">申請 {formatDateTimeJP(s.createdAt)} / 修正 {formatDateTimeJP(s.updatedAt)} / v{s.version}</p>
                   </div>
                   <div className="flex gap-1.5 shrink-0 flex-wrap">
-                    {s.status === 'plan' && (
+                    {s.timeType === 'none' ? (
+                      // 不可申請: 確認のみ（承認・調整は不要）
+                      s.status === 'plan' && (
+                        <Button size="sm" variant="secondary" onClick={() => doDeny(s)}><CheckCircle2 className="w-4 h-4" />確認済に</Button>
+                      )
+                    ) : (
                       <>
-                        <Button size="sm" variant="success" onClick={() => doApprove(s)}><CheckCircle2 className="w-4 h-4" />許可</Button>
-                        <Button size="sm" variant="danger" onClick={() => doDeny(s)}><XCircle className="w-4 h-4" />否認</Button>
-                        <Button size="sm" variant="secondary" onClick={() => openAdjust(s)}><Sliders className="w-4 h-4" />調整</Button>
-                      </>
-                    )}
-                    {s.status === 'confirmed' && (
-                      <Button size="sm" variant="secondary" onClick={() => openAdjust(s)}><Sliders className="w-4 h-4" />再調整</Button>
-                    )}
-                    {s.status === 'reviewed' && (
-                      <>
-                        <Button size="sm" variant="success" onClick={() => doApprove(s)}><CheckCircle2 className="w-4 h-4" />許可</Button>
-                        <Button size="sm" variant="secondary" onClick={() => openAdjust(s)}><Sliders className="w-4 h-4" />調整</Button>
+                        {s.status === 'plan' && (
+                          <>
+                            <Button size="sm" variant="success" onClick={() => doApprove(s)}><CheckCircle2 className="w-4 h-4" />許可</Button>
+                            <Button size="sm" variant="danger" onClick={() => doDeny(s)}><XCircle className="w-4 h-4" />否認</Button>
+                            <Button size="sm" variant="secondary" onClick={() => openAdjust(s)}><Sliders className="w-4 h-4" />調整</Button>
+                          </>
+                        )}
+                        {s.status === 'confirmed' && (
+                          <Button size="sm" variant="secondary" onClick={() => openAdjust(s)}><Sliders className="w-4 h-4" />再調整</Button>
+                        )}
+                        {s.status === 'reviewed' && (
+                          <>
+                            <Button size="sm" variant="success" onClick={() => doApprove(s)}><CheckCircle2 className="w-4 h-4" />許可</Button>
+                            <Button size="sm" variant="secondary" onClick={() => openAdjust(s)}><Sliders className="w-4 h-4" />調整</Button>
+                          </>
+                        )}
                       </>
                     )}
                   </div>

@@ -36,7 +36,8 @@ export function CalendarPage() {
 
   const filtered = useMemo(() => {
     if (filterName === 'self' && myName) return shifts.filter((s) => s.memberName === myName);
-    return shifts;
+    // 全員表示: 確定シフトのみ（不可・予定・確認済は非表示）
+    return shifts.filter((s) => s.status === 'confirmed');
   }, [shifts, filterName, myName]);
 
   const selectedShifts = useMemo(
@@ -59,7 +60,7 @@ export function CalendarPage() {
       <div className="mb-4">
         <h1 className="text-lg font-bold text-gray-900">シフトカレンダー</h1>
         <p className="text-sm text-gray-500">
-          {filterName === 'self' ? '自分のシフトを表示中' : '全員のシフトを表示中（グラデーション：メンバー別色）'}
+          {filterName === 'self' ? '自分のシフトを表示中' : '全員の確定シフトのみ表示中'}
         </p>
       </div>
 

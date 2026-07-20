@@ -14,6 +14,7 @@ import type { Role } from '../lib/types';
 
 const LS_NAME_KEY = 'shiftapp.name';
 const LS_ROLE_KEY = 'shiftapp.role';
+export const LS_SAVED_NAME_KEY = 'shiftapp.savedName'; // 次回ログイン時の名前自動補完用
 
 interface AuthCtx {
   role: Role | null;
@@ -106,6 +107,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         mockStore.upsertMember(n);
       },
       signOut: async () => {
+        // 名前をキャッシュとして保持（次回ログイン時の自動補完用）
+        if (name) localStorage.setItem(LS_SAVED_NAME_KEY, name);
         if (isFirebaseConfigured && auth) await fbSignOut(auth);
         setRole(null);
         setNameState(null);

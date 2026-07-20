@@ -107,6 +107,36 @@ export function AdminLinePage() {
         </Card>
       )}
 
+      {/* 本日のシフト概要（メッセージ作成の参考用） */}
+      <Card className="p-4 mb-4">
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-xs font-semibold text-gray-700 flex items-center gap-1.5">
+            <CalendarDays className="w-3.5 h-3.5" />本日({formatDateJP(todayStr())})のシフト
+          </p>
+          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${todayShifts.length > 0 ? 'bg-confirmed-soft text-confirmed-strong' : 'bg-gray-100 text-gray-400'}`}>
+            {todayShifts.length}名
+          </span>
+        </div>
+        {todayShifts.length === 0 ? (
+          <p className="text-xs text-gray-400">本日のシフトはありません</p>
+        ) : (
+          <div className="flex flex-wrap gap-1.5">
+            {todayShifts.map((s) => (
+              <span
+                key={s.id}
+                className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                  s.status === 'confirmed' ? 'bg-confirmed-soft text-confirmed-strong' :
+                  s.status === 'reviewed'  ? 'bg-gray-100 text-gray-400' :
+                  'bg-plan-soft text-plan-strong'
+                }`}
+              >
+                {s.memberName}{s.status === 'plan' && '（予）'}{s.status === 'reviewed' && '（済）'}
+              </span>
+            ))}
+          </div>
+        )}
+      </Card>
+
       {/* GID管理 */}
       <Card className="p-4 mb-4">
         <div className="flex items-center justify-between flex-wrap gap-2">

@@ -85,6 +85,28 @@ export function AdminShiftPage() {
 
   const planCount = shifts.filter((s) => s.status === 'plan').length;
 
+  // 本日から7日間の日ごとシフト集計
+  const today = todayStr();
+  const weekSummary = useMemo(() => {
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(today + 'T00:00:00');
+      d.setDate(d.getDate() + i);
+      const date = d.toISOString().slice(0, 10);
+      const dayShifts = shifts.filter((s) => s.date === date);
+      return {
+        date,
+        wd: ['日', '月', '火', '水', '木', '金', '土'][d.getDay()],
+        day: d.getDate(),
+        isToday: i === 0,
+        isSun: d.getDay() === 0,
+        isSat: d.getDay() === 6,
+        confirmed: dayShifts.filter((s) => s.status === 'confirmed').length,
+        plan: dayShifts.filter((s) => s.status === 'plan').length,
+        reviewed: dayShifts.filter((s) => s.status === 'reviewed').length,
+      };
+    });
+  }, [shifts, today]);
+
   const doApprove = async (s: Shift) => {
     try {
       const res = await approveShift({ shiftId: s.id, action: 'approve', adminName, expectedVersion: s.version });
@@ -111,8 +133,7 @@ export function AdminShiftPage() {
     setAdjTimeEnd(s.timeEnd ?? '17:00');
     setAdjSubject(s.subject);
     setAdjPlace(s.place ?? '');
-    // 時間指定済みの場合は初期表示ON、それ以外はOFF（+ボタンで追加可能）
-    setAdjAddTime(s.timeType === 'time' || s.timeType === 'template');
+    setAdjAddTime(false); // 常に初期表示なし（+ボタンで追加）
   };
 
   const doAdjust = async () => {
@@ -202,6 +223,25 @@ export function AdminShiftPage() {
           </Button>
         </div>
       </div>
+
+      {/* 週間人数サマリー */}
+      <Card className="p-3 mb-4 overflow-x-auto">
+        <p className="text-xs font-medium text-gray-500 mb-2">今後7日間の人数</p>
+        <div className="flex gap-2 min-w-max">
+          {weekSummary.map(({ date, wd, day, isToday, isSun, isSat, confirmed, plan, reviewed }) => (
+            <div key={date} className={`flex flex-col items-center px-3 py-2 rounded-xl min-w-[52px] ${isToday ? 'bg-brand-50 ring-1 ring-brand-300' : 'bg-gray-50'}`}>
+              <span className={`text-[10px] font-medium ${isSun ? 'text-red-500' : isSat ? 'text-blue-500' : 'text-gray-500'}`}>{wd}</span>
+              <span className={`text-sm font-bold ${isToday ? 'text-brand-700' : 'text-gray-800'}`}>{day}</span>
+              <div className="mt-1 space-y-0.5 text-[10px] text-center w-full">
+                {confirmed > 0 && <div className="bg-confirmed-soft text-confirmed-strong rounded px-1">確{confirmed}</div>}
+                {plan > 0 && <div className="bg-plan-soft text-plan-strong rounded px-1">予{plan}</div>}
+                {reviewed > 0 && <div className="bg-gray-100 text-gray-400 rounded px-1">済{reviewed}</div>}
+                {confirmed === 0 && plan === 0 && reviewed === 0 && <div className="text-gray-300">—</div>}
+              </div>
+            </div>
+          ))}
+        </div>
+      </Card>
 
       {/* ソートタブ + フィルタ */}
       <Card className="p-3 mb-4">
@@ -389,13 +429,9 @@ export function AdminShiftPage() {
                 </a>
               )}
             </div>
-            <div className="grid grid-cols-2 gap-2 mb-3 text-xs">
+            <div className="mb-3 text-xs">
               <div className="bg-gray-50 rounded-lg p-2">
-                <p className="text-gray-400">記入日</p>
-                <p className="text-gray-700 font-medium">{memberInfo ? formatDateTimeJP(memberInfo.createdAt) : '—'}</p>
-              </div>
-              <div className="bg-gray-50 rounded-lg p-2">
-                <p className="text-gray-400">最終更新日</p>
+                <p className="text-gray-400">最終送信日</p>
                 <p className="text-gray-700 font-medium">{memberInfo ? formatDateTimeJP(memberInfo.updatedAt) : '—'}</p>
               </div>
             </div>

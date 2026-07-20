@@ -44,7 +44,7 @@ export function AdminShiftPage() {
   const adminName = name ?? '管理者';
   const toast = useToast();
   const [sortKey, setSortKey] = useState<SortKey>('date');
-  const [activeFilters, setActiveFilters] = useState<Set<FilterStatus>>(new Set(['plan']));
+  const [activeFilters, setActiveFilters] = useState<Set<FilterStatus>>(new Set(['plan', 'delete_request']));
 
   const toggleFilter = (f: FilterStatus) => {
     setActiveFilters((prev) => {

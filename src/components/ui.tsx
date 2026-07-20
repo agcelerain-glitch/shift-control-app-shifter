@@ -6,12 +6,28 @@ import { X } from 'lucide-react';
 type Variant = 'primary' | 'secondary' | 'ghost' | 'danger' | 'success';
 type Size = 'sm' | 'md' | 'lg';
 
+// グラデーション: ボタン上部18%で明→基調色に変化（光が当たっているシェーン効果）
 const variantCls: Record<Variant, string> = {
-  primary: 'bg-brand-600 text-white hover:bg-brand-700 shadow-sm',
-  secondary: 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50',
-  ghost: 'text-gray-600 hover:bg-gray-100',
-  danger: 'bg-red-500 text-white hover:bg-red-600 shadow-sm',
-  success: 'bg-confirmed-strong text-white hover:bg-green-700 shadow-sm',
+  primary:
+    'bg-[linear-gradient(to_bottom,#60a5fa,#2563eb_18%,#2563eb)] text-white shadow-sm ' +
+    'hover:bg-[linear-gradient(to_bottom,#93c5fd,#3b82f6_18%,#3b82f6)] hover:shadow-md hover:scale-[1.02] ' +
+    'active:scale-[0.97] active:shadow-sm transition-all duration-150',
+  secondary:
+    'bg-[linear-gradient(to_bottom,#ffffff,#f3f4f6_18%,#f3f4f6)] text-gray-700 border border-gray-200 shadow-sm ' +
+    'hover:bg-[linear-gradient(to_bottom,#f9fafb,#e5e7eb_18%,#e5e7eb)] hover:border-gray-300 hover:shadow-md hover:scale-[1.02] ' +
+    'active:scale-[0.97] active:shadow-sm transition-all duration-150',
+  ghost:
+    'text-gray-600 ' +
+    'hover:bg-gray-100 hover:text-gray-800 ' +
+    'active:scale-[0.97] transition-all duration-150',
+  danger:
+    'bg-[linear-gradient(to_bottom,#f87171,#dc2626_18%,#dc2626)] text-white shadow-sm ' +
+    'hover:bg-[linear-gradient(to_bottom,#fca5a5,#ef4444_18%,#ef4444)] hover:shadow-md hover:scale-[1.02] ' +
+    'active:scale-[0.97] active:shadow-sm transition-all duration-150',
+  success:
+    'bg-[linear-gradient(to_bottom,#4ade80,#16a34a_18%,#16a34a)] text-white shadow-sm ' +
+    'hover:bg-[linear-gradient(to_bottom,#86efac,#22c55e_18%,#22c55e)] hover:shadow-md hover:scale-[1.02] ' +
+    'active:scale-[0.97] active:shadow-sm transition-all duration-150',
 };
 const sizeCls: Record<Size, string> = {
   sm: 'px-3 py-1.5 text-sm rounded-lg',
@@ -28,7 +44,7 @@ export function Button({
 }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant; size?: Size }) {
   return (
     <button
-      className={`inline-flex items-center justify-center gap-2 font-medium transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed ${variantCls[variant]} ${sizeCls[size]} ${className}`}
+      className={`inline-flex items-center justify-center gap-2 font-medium disabled:opacity-50 disabled:cursor-not-allowed ${variantCls[variant]} ${sizeCls[size]} ${className}`}
       {...props}
     >
       {children}

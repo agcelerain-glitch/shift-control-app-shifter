@@ -1,6 +1,6 @@
 // /admin-line LINE操作: グループ送信・自分への連絡・個別チャット・GID管理
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { AdminLayout } from '../components/AdminLayout';
 import { useData } from '../contexts/DataContext';
 import { useAuth } from '../contexts/AuthContext';
@@ -32,6 +32,17 @@ export function AdminLinePage() {
   const [deletingGid, setDeletingGid] = useState(false);
   // カレンダー
   const [calSelected, setCalSelected] = useState<string | null>(null);
+  type CalFilter = 'plan' | 'confirmed' | 'reviewed' | 'unavailable';
+  const [calFilters, setCalFilters] = useState<Set<CalFilter>>(
+    new Set(['plan', 'confirmed', 'reviewed', 'unavailable'])
+  );
+  const toggleCalFilter = (f: CalFilter) => {
+    setCalFilters((prev) => {
+      const next = new Set(prev);
+      if (next.has(f)) next.delete(f); else next.add(f);
+      return next;
+    });
+  };
 
   // LINEグループID購読
   useEffect(() => {
@@ -89,6 +100,15 @@ export function AdminLinePage() {
       setDeletingGid(false);
     }
   };
+
+  const calShifts = useMemo(() => shifts.filter((s) => {
+    const isUnavail = s.timeType === 'none';
+    if (isUnavail) return calFilters.has('unavailable');
+    if (s.status === 'plan') return calFilters.has('plan');
+    if (s.status === 'confirmed') return calFilters.has('confirmed');
+    if (s.status === 'reviewed') return calFilters.has('reviewed');
+    return false;
+  }), [shifts, calFilters]);
 
   const calSelectedShifts = calSelected ? shifts.filter((s) => s.date === calSelected) : [];
 
@@ -304,7 +324,26 @@ export function AdminLinePage() {
         <h2 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
           <CalendarDays className="w-4 h-4" />全体シフトカレンダー
         </h2>
-        <MonthCalendar shifts={shifts} onSelectDate={setCalSelected} />
+        {/* カレンダーフィルターボタン（複数選択） */}
+        <div className="flex gap-1.5 flex-wrap mb-3">
+          {([
+            { id: 'plan', label: '予定', activeClass: 'border-amber-400 bg-amber-50 text-amber-700' },
+            { id: 'confirmed', label: '確定', activeClass: 'border-green-500 bg-green-50 text-green-700' },
+            { id: 'reviewed', label: '確認済', activeClass: 'border-gray-400 bg-gray-100 text-gray-600' },
+            { id: 'unavailable', label: '不可', activeClass: 'border-slate-500 bg-slate-100 text-slate-600' },
+          ] as const).map((f) => (
+            <button
+              key={f.id}
+              onClick={() => toggleCalFilter(f.id)}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium border-2 transition-all duration-150 ${
+                calFilters.has(f.id) ? f.activeClass : 'border-gray-200 bg-white text-gray-400'
+              }`}
+            >
+              {f.label}
+            </button>
+          ))}
+        </div>
+        <MonthCalendar shifts={calShifts} onSelectDate={setCalSelected} />
       </div>
 
       {/* カレンダー日付クリック時のシフト詳細 */}

@@ -32,8 +32,8 @@ function ShiftCard({ shift, onCopy, onCancel }: { shift: Shift; onCopy: (text: s
             <span className={`text-sm font-medium ${weekdayJP(shift.date) === '日' ? 'text-red-500' : weekdayJP(shift.date) === '土' ? 'text-blue-500' : 'text-gray-700'}`}>
               {formatDateJP(shift.date)}
             </span>
-            <Badge color={shift.status === 'confirmed' ? 'confirmed' : 'plan'}>
-              {shift.status === 'confirmed' ? '確定' : '予定'}
+            <Badge color={shift.status === 'confirmed' ? 'confirmed' : shift.status === 'reviewed' ? 'reviewed' : 'plan'}>
+              {shift.status === 'confirmed' ? '確定' : shift.status === 'reviewed' ? '確認済' : '予定'}
             </Badge>
           </div>
           <p className="font-medium text-gray-900 mb-1">{shift.subject}</p>
@@ -88,7 +88,7 @@ export function PersonalPage() {
 
   const todayList = mine.filter((s) => s.date === today);
   // 過去の未確定も含めて全件表示（取り消しできるようにするため日付絞り込みなし）
-  const planList = mine.filter((s) => s.status === 'plan' && s.date !== today);
+  const planList = mine.filter((s) => (s.status === 'plan' || s.status === 'reviewed') && s.date !== today);
   const confirmedList = mine.filter((s) => s.status === 'confirmed' && s.date !== today);
 
   const list = tab === 'today' ? todayList : tab === 'plan' ? planList : confirmedList;

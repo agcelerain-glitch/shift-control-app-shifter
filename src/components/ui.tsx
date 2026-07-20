@@ -36,11 +36,12 @@ export function Button({
   );
 }
 
-export function Badge({ children, color = 'gray', className = '' }: { children: ReactNode; color?: 'gray' | 'plan' | 'confirmed' | 'today' | 'blue' | 'red'; className?: string }) {
+export function Badge({ children, color = 'gray', className = '' }: { children: ReactNode; color?: 'gray' | 'plan' | 'confirmed' | 'reviewed' | 'today' | 'blue' | 'red'; className?: string }) {
   const cls = {
     gray: 'bg-gray-100 text-gray-600',
     plan: 'bg-plan-soft text-plan-strong border border-plan-base',
     confirmed: 'bg-confirmed-soft text-confirmed-strong border border-confirmed-base',
+    reviewed: 'bg-gray-100 text-gray-400 border border-gray-300',
     today: 'bg-red-50 text-red-600 border border-red-300',
     blue: 'bg-brand-100 text-brand-700',
     red: 'bg-red-100 text-red-700',

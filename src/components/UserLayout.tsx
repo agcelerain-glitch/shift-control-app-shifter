@@ -67,7 +67,7 @@ export function UserLayout({ children }: { children: ReactNode }) {
 
       <footer className="mt-8 pb-6 text-center">
         <button
-          onClick={() => navigate('/admin-top')}
+          onClick={async () => { await signOut(); navigate('/admin-top'); }}
           className="text-xs text-gray-300 hover:text-gray-500 transition-colors"
         >
           管理者ログイン

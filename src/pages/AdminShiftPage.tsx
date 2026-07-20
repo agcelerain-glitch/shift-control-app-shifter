@@ -8,23 +8,22 @@ import { useAuth } from '../contexts/AuthContext';
 import { Card, Button, Badge, Input, Select, Modal, EmptyState } from '../components/ui';
 import {
   CheckCircle2, XCircle, Sliders, RotateCcw, Users, MessageCircle, MapPin, Clock, User as UserIcon,
-  CalendarDays, Hash, ChevronDown, ChevronRight, History, Trash2,
+  CalendarDays, Calendar, Hash, ChevronDown, ChevronRight, History, Trash2, Plus, Minus,
 } from 'lucide-react';
 import { formatDateJP, formatDateTimeJP, isPast7Days, weekdayJP, todayStr } from '../lib/utils';
 import { TEMPLATE_LABELS } from '../lib/types';
 import type { Shift, ApprovalLog } from '../lib/types';
 import { approveShift, restoreShift, updateMemberLineId, deleteMember } from '../lib/db';
 
-type SortKey = 'place' | 'time' | 'name' | 'weekday' | 'headcount';
+type SortKey = 'date' | 'place' | 'time' | 'name' | 'weekday' | 'headcount';
 
-// 場所選択肢（4択）— 実際の店舗名に合わせて変更してください
 const PLACE_OPTIONS = ['本店', '支店A', '支店B', '倉庫'] as const;
 
 function timeLabelOf(s: Shift): string {
   if (s.timeType === 'template' && s.template) return TEMPLATE_LABELS[s.template];
   if (s.timeType === 'time') return `${s.timeStart}〜${s.timeEnd}`;
   if (s.timeType === 'other') return 'その他';
-  return '指定なし';
+  return '';
 }
 function timeSortVal(s: Shift): number {
   if (s.timeType === 'time' && s.timeStart) return parseInt(s.timeStart.replace(':', ''), 10);
@@ -32,13 +31,19 @@ function timeSortVal(s: Shift): number {
   return 9999;
 }
 
+function statusBadge(s: Shift) {
+  if (s.status === 'confirmed') return <Badge color="confirmed">確定</Badge>;
+  if (s.status === 'reviewed') return <Badge color="reviewed">確認済</Badge>;
+  return <Badge color="plan">予定</Badge>;
+}
+
 export function AdminShiftPage() {
   const { shifts, members, approvalLogs } = useData();
   const { name } = useAuth();
   const adminName = name ?? '管理者';
   const toast = useToast();
-  const [sortKey, setSortKey] = useState<SortKey>('weekday');
-  const [filter, setFilter] = useState<'all' | 'plan' | 'confirmed'>('plan');
+  const [sortKey, setSortKey] = useState<SortKey>('date');
+  const [filter, setFilter] = useState<'all' | 'plan' | 'confirmed' | 'reviewed'>('plan');
   const [search, setSearch] = useState('');
   const [adjusting, setAdjusting] = useState<Shift | null>(null);
   const [membersOpen, setMembersOpen] = useState(false);
@@ -54,17 +59,20 @@ export function AdminShiftPage() {
   const [adjTimeEnd, setAdjTimeEnd] = useState('');
   const [adjSubject, setAdjSubject] = useState('');
   const [adjPlace, setAdjPlace] = useState('');
+  const [adjAddTime, setAdjAddTime] = useState(false);
 
   const filtered = useMemo(() => {
     let list = shifts;
     if (filter === 'plan') list = list.filter((s) => s.status === 'plan');
     if (filter === 'confirmed') list = list.filter((s) => s.status === 'confirmed');
+    if (filter === 'reviewed') list = list.filter((s) => s.status === 'reviewed');
     if (search.trim()) {
       const q = search.trim().toLowerCase();
       list = list.filter((s) => s.memberName.toLowerCase().includes(q) || s.subject.toLowerCase().includes(q) || (s.place ?? '').toLowerCase().includes(q));
     }
     const sorted = [...list].sort((a, b) => {
       switch (sortKey) {
+        case 'date': return a.date.localeCompare(b.date);
         case 'place': return (a.place ?? 'zzz').localeCompare(b.place ?? 'zzz') || a.date.localeCompare(b.date);
         case 'time': return timeSortVal(a) - timeSortVal(b) || a.date.localeCompare(b.date);
         case 'name': return a.memberName.localeCompare(b.memberName, 'ja') || a.date.localeCompare(b.date);
@@ -79,7 +87,7 @@ export function AdminShiftPage() {
 
   const doApprove = async (s: Shift) => {
     try {
-      const res = await approveShift({ shiftId: s.id, action: 'approve', adminName: adminName, expectedVersion: s.version });
+      const res = await approveShift({ shiftId: s.id, action: 'approve', adminName, expectedVersion: s.version });
       if (res === 'ok') toast.show(`${s.memberName}さんのシフトを確定しました`, 'success');
       else if (res === 'conflict') toast.show('競合: 最新データを再取得してください（画面を更新）', 'error');
     } catch (e) {
@@ -89,8 +97,8 @@ export function AdminShiftPage() {
 
   const doDeny = async (s: Shift) => {
     try {
-      const res = await approveShift({ shiftId: s.id, action: 'deny', adminName: adminName, expectedVersion: s.version });
-      if (res === 'ok') toast.show(`${s.memberName}さんのシフトを否認（planに戻しました）`, 'info');
+      const res = await approveShift({ shiftId: s.id, action: 'deny', adminName, expectedVersion: s.version });
+      if (res === 'ok') toast.show(`${s.memberName}さんのシフトを確認済み（否認）にしました`, 'info');
       else if (res === 'conflict') toast.show('競合: 画面を更新してください', 'error');
     } catch (e) {
       toast.show(`否認エラー: ${(e as Error).message}`, 'error');
@@ -103,6 +111,8 @@ export function AdminShiftPage() {
     setAdjTimeEnd(s.timeEnd ?? '17:00');
     setAdjSubject(s.subject);
     setAdjPlace(s.place ?? '');
+    // 時間指定済みの場合は初期表示ON、それ以外はOFF（+ボタンで追加可能）
+    setAdjAddTime(s.timeType === 'time' || s.timeType === 'template');
   };
 
   const doAdjust = async () => {
@@ -111,14 +121,14 @@ export function AdminShiftPage() {
       const adjustFields: Parameters<typeof approveShift>[0]['adjustFields'] = {
         subject: adjSubject.trim(),
         ...(adjPlace.trim() ? { place: adjPlace.trim() } : {}),
-        ...(adjusting.timeType !== 'none'
+        ...(adjAddTime
           ? { timeStart: adjTimeStart, timeEnd: adjTimeEnd, timeType: 'time' as const }
-          : { timeType: 'none' as const }),
+          : {}),
       };
       const res = await approveShift({
         shiftId: adjusting.id,
         action: 'adjust',
-        adminName: adminName,
+        adminName,
         expectedVersion: adjusting.version,
         adjustFields,
       });
@@ -167,7 +177,8 @@ export function AdminShiftPage() {
     }
   };
 
-  const sortTabs: { id: SortKey; label: string; icon: typeof MapPin }[] = [
+  const sortTabs: { id: SortKey; label: string; icon: typeof Calendar }[] = [
+    { id: 'date', label: '日付', icon: Calendar },
     { id: 'weekday', label: '曜日', icon: CalendarDays },
     { id: 'place', label: '場所', icon: MapPin },
     { id: 'time', label: '時間', icon: Clock },
@@ -212,6 +223,7 @@ export function AdminShiftPage() {
           <Select value={filter} onChange={(e) => setFilter(e.target.value as typeof filter)} className="w-auto">
             <option value="plan">予定のみ</option>
             <option value="confirmed">確定のみ</option>
+            <option value="reviewed">確認済（否認）</option>
             <option value="all">すべて</option>
           </Select>
           <Input placeholder="名前・件名・場所で検索" value={search} onChange={(e) => setSearch(e.target.value)} className="flex-1 min-w-[160px]" />
@@ -225,12 +237,13 @@ export function AdminShiftPage() {
         <div className="space-y-2">
           {filtered.map((s) => {
             const isToday = s.date === todayStr();
+            const timeLabel = timeLabelOf(s);
             return (
-              <Card key={s.id} className="p-4 hover:shadow-cardLg transition">
+              <Card key={s.id} className={`p-4 hover:shadow-cardLg transition ${s.status === 'reviewed' ? 'opacity-70' : ''}`}>
                 <div className="flex items-start justify-between gap-3 flex-wrap">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
-                      <Badge color={s.status === 'confirmed' ? 'confirmed' : 'plan'}>{s.status === 'confirmed' ? '確定' : '予定'}</Badge>
+                      {statusBadge(s)}
                       {isToday && <Badge color="today">当日</Badge>}
                       <span className={`text-sm font-medium ${weekdayJP(s.date) === '日' ? 'text-red-500' : weekdayJP(s.date) === '土' ? 'text-blue-500' : 'text-gray-700'}`}>
                         {formatDateJP(s.date)}
@@ -238,15 +251,15 @@ export function AdminShiftPage() {
                     </div>
                     <p className="font-medium text-gray-900">{s.memberName} · {s.subject}</p>
                     <div className="flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-gray-500 mt-1">
-                      {s.timeType === 'time' && (
-                        <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{s.timeStart}〜{s.timeEnd}</span>
+                      {timeLabel && (
+                        <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{timeLabel}</span>
                       )}
                       {s.place && <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{s.place}</span>}
                       {s.headcount && <span className="flex items-center gap-1"><Hash className="w-3 h-3" />{s.headcount}人</span>}
                     </div>
                     <p className="text-[10px] text-gray-400 mt-1">申請 {formatDateTimeJP(s.createdAt)} / 修正 {formatDateTimeJP(s.updatedAt)} / v{s.version}</p>
                   </div>
-                  <div className="flex gap-1.5 shrink-0">
+                  <div className="flex gap-1.5 shrink-0 flex-wrap">
                     {s.status === 'plan' && (
                       <>
                         <Button size="sm" variant="success" onClick={() => doApprove(s)}><CheckCircle2 className="w-4 h-4" />許可</Button>
@@ -256,6 +269,12 @@ export function AdminShiftPage() {
                     )}
                     {s.status === 'confirmed' && (
                       <Button size="sm" variant="secondary" onClick={() => openAdjust(s)}><Sliders className="w-4 h-4" />再調整</Button>
+                    )}
+                    {s.status === 'reviewed' && (
+                      <>
+                        <Button size="sm" variant="success" onClick={() => doApprove(s)}><CheckCircle2 className="w-4 h-4" />許可</Button>
+                        <Button size="sm" variant="secondary" onClick={() => openAdjust(s)}><Sliders className="w-4 h-4" />調整</Button>
+                      </>
                     )}
                   </div>
                 </div>
@@ -280,22 +299,40 @@ export function AdminShiftPage() {
         {adjusting && (
           <div className="space-y-3">
             <p className="text-sm text-gray-600">{adjusting.memberName} · {formatDateJP(adjusting.date)}</p>
-            {adjusting.timeType !== 'none' && (
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">開始</label>
-                  <Input type="time" value={adjTimeStart} onChange={(e) => setAdjTimeStart(e.target.value)} />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">終了</label>
-                  <Input type="time" value={adjTimeEnd} onChange={(e) => setAdjTimeEnd(e.target.value)} />
-                </div>
-              </div>
-            )}
+
+            {/* 件名 */}
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">件名</label>
               <Input value={adjSubject} onChange={(e) => setAdjSubject(e.target.value)} />
             </div>
+
+            {/* 時間（時間指定・テンプレは初期ON、なし系は+ボタンで追加） */}
+            <div>
+              <button
+                type="button"
+                onClick={() => setAdjAddTime(!adjAddTime)}
+                className="flex items-center gap-1 text-xs text-brand-600 hover:text-brand-800 mb-2 font-medium"
+              >
+                {adjAddTime
+                  ? <><Minus className="w-3.5 h-3.5" />時間指定を削除</>
+                  : <><Plus className="w-3.5 h-3.5" />時間を指定する</>
+                }
+              </button>
+              {adjAddTime && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">開始</label>
+                    <Input type="time" value={adjTimeStart} onChange={(e) => setAdjTimeStart(e.target.value)} />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">終了</label>
+                    <Input type="time" value={adjTimeEnd} onChange={(e) => setAdjTimeEnd(e.target.value)} />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* 場所 */}
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">場所</label>
               <Select value={adjPlace} onChange={(e) => setAdjPlace(e.target.value)}>
@@ -362,7 +399,6 @@ export function AdminShiftPage() {
                 <p className="text-gray-700 font-medium">{memberInfo ? formatDateTimeJP(memberInfo.updatedAt) : '—'}</p>
               </div>
             </div>
-            {/* LINE ID 表示 */}
             <div className="mb-3 p-3 rounded-lg bg-gray-50 text-xs">
               <p className="text-gray-400 mb-1">LINE ID</p>
               <p className={`font-mono break-all ${memberInfo?.lineUserId ? 'text-gray-600' : 'text-gray-400 italic'}`}>
@@ -370,7 +406,6 @@ export function AdminShiftPage() {
               </p>
             </div>
 
-            {/* 削除（2段階確認） */}
             {!showDeleteConfirm ? (
               <div className="flex justify-end">
                 <Button size="sm" variant="danger" onClick={() => setShowDeleteConfirm(true)}>
@@ -396,7 +431,7 @@ export function AdminShiftPage() {
                 </div>
               </div>
             )}
-            <p className="text-xs font-medium text-gray-600 mb-2">申請履歴</p>
+            <p className="text-xs font-medium text-gray-600 mb-2 mt-3">申請履歴</p>
             <div className="space-y-1.5 max-h-60 overflow-y-auto">
               {memberShifts.length === 0 ? (
                 <p className="text-sm text-gray-400">申請なし</p>
@@ -404,7 +439,9 @@ export function AdminShiftPage() {
                 memberShifts.map((s) => (
                   <div key={s.id} className="flex items-center justify-between text-xs p-2 rounded bg-gray-50">
                     <span className="flex items-center gap-1.5">
-                      <Badge color={s.status === 'confirmed' ? 'confirmed' : 'plan'}>{s.status === 'confirmed' ? '確' : '予'}</Badge>
+                      <Badge color={s.status === 'confirmed' ? 'confirmed' : s.status === 'reviewed' ? 'reviewed' : 'plan'}>
+                        {s.status === 'confirmed' ? '確' : s.status === 'reviewed' ? '済' : '予'}
+                      </Badge>
                       {formatDateJP(s.date)} · {s.subject}
                     </span>
                     <span className="text-gray-400">{new Date(s.createdAt).toLocaleDateString()}</span>
@@ -429,7 +466,7 @@ export function AdminShiftPage() {
                 <div key={log.id} className="p-3 rounded-lg border border-gray-100">
                   <div className="flex items-center justify-between mb-1">
                     <div className="flex items-center gap-2">
-                      <Badge color={log.action === 'approve' ? 'confirmed' : log.action === 'deny' ? 'red' : 'blue'}>
+                      <Badge color={log.action === 'approve' ? 'confirmed' : log.action === 'deny' ? 'reviewed' : 'blue'}>
                         {log.action === 'approve' ? '許可' : log.action === 'deny' ? '否認' : '調整'}
                       </Badge>
                       <span className="text-xs text-gray-500">{formatDateTimeJP(log.createdAt)}</span>
@@ -440,7 +477,7 @@ export function AdminShiftPage() {
                   </div>
                   {before && (
                     <p className="text-xs text-gray-600">
-                      {before.memberName} · {formatDateJP(before.date)} · {before.subject} ({before.status === 'confirmed' ? '確定' : '予定'})
+                      {before.memberName} · {formatDateJP(before.date)} · {before.subject} ({before.status === 'confirmed' ? '確定' : before.status === 'reviewed' ? '確認済' : '予定'})
                     </p>
                   )}
                   {expired && <p className="text-[10px] text-gray-400 mt-1">7日経過のため復元不可</p>}

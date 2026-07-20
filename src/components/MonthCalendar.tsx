@@ -1,4 +1,4 @@
-// 月表示カレンダー: 全ユーザーのシフトを重ねて表示、予定/確定/当日を配色で区別
+// 月表示カレンダー: 全ユーザーのシフトを重ねて表示、予定/確定/当日/確認済を配色で区別
 
 import { useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
@@ -8,7 +8,43 @@ import { Badge } from './ui';
 
 const WEEK = ['日', '月', '火', '水', '木', '金', '土'];
 
-export function MonthCalendar({ shifts, onSelectDate }: { shifts: Shift[]; onSelectDate?: (date: string) => void }) {
+export interface MemberColor {
+  planBg: string;
+  planText: string;
+  confirmedBg: string;
+  confirmedText: string;
+  reviewedBg: string;
+  reviewedText: string;
+}
+
+function getShiftStyle(s: Shift, mc: MemberColor | undefined): { style?: React.CSSProperties; cls: string } {
+  if (mc) {
+    const bg =
+      s.status === 'confirmed' ? mc.confirmedBg :
+      s.status === 'reviewed'  ? mc.reviewedBg  : mc.planBg;
+    const color =
+      s.status === 'confirmed' ? mc.confirmedText :
+      s.status === 'reviewed'  ? mc.reviewedText  : mc.planText;
+    return { style: { backgroundColor: bg, color }, cls: 'text-[10px] leading-tight px-1 py-0.5 rounded truncate' };
+  }
+  const cls =
+    s.status === 'confirmed'
+      ? 'bg-confirmed-soft text-confirmed-strong'
+      : s.status === 'reviewed'
+        ? 'bg-gray-100 text-gray-400 line-through'
+        : 'bg-plan-soft text-plan-strong';
+  return { cls: `text-[10px] leading-tight px-1 py-0.5 rounded truncate ${cls}` };
+}
+
+export function MonthCalendar({
+  shifts,
+  onSelectDate,
+  memberColors,
+}: {
+  shifts: Shift[];
+  onSelectDate?: (date: string) => void;
+  memberColors?: Record<string, MemberColor>;
+}) {
   const today = todayStr();
   const [cursor, setCursor] = useState(() => {
     const d = new Date();
@@ -79,19 +115,19 @@ export function MonthCalendar({ shifts, onSelectDate }: { shifts: Shift[]; onSel
                 {!isToday && d.getDate()}
               </div>
               <div className="space-y-0.5">
-                {dayShifts.slice(0, 3).map((s) => (
-                  <div
-                    key={s.id}
-                    className={`text-[10px] leading-tight px-1 py-0.5 rounded truncate ${
-                      s.status === 'confirmed'
-                        ? 'bg-confirmed-soft text-confirmed-strong'
-                        : 'bg-plan-soft text-plan-strong'
-                    }`}
-                    title={`${s.memberName} ${s.subject}`}
-                  >
-                    {s.memberName.split(' ')[0]}・{s.subject}
-                  </div>
-                ))}
+                {dayShifts.slice(0, 3).map((s) => {
+                  const { style, cls } = getShiftStyle(s, memberColors?.[s.memberName]);
+                  return (
+                    <div
+                      key={s.id}
+                      className={cls}
+                      style={style}
+                      title={`${s.memberName} ${s.subject}`}
+                    >
+                      {s.memberName.split(' ')[0]}・{s.subject}
+                    </div>
+                  );
+                })}
                 {dayShifts.length > 3 && <div className="text-[10px] text-gray-400 px-1">他{dayShifts.length - 3}件</div>}
               </div>
               {dayShifts.length === 0 && inMonth && !isToday && (
@@ -102,14 +138,15 @@ export function MonthCalendar({ shifts, onSelectDate }: { shifts: Shift[]; onSel
         })}
       </div>
 
-      <div className="flex items-center gap-4 px-4 py-3 border-t border-gray-100 bg-gray-50 text-xs">
+      <div className="flex items-center gap-4 px-4 py-3 border-t border-gray-100 bg-gray-50 text-xs flex-wrap">
         <span className="flex items-center gap-1.5">
           <Badge color="confirmed">確定</Badge>
-          <span className="text-gray-500">status=confirmed</span>
         </span>
         <span className="flex items-center gap-1.5">
           <Badge color="plan">予定</Badge>
-          <span className="text-gray-500">status=plan</span>
+        </span>
+        <span className="flex items-center gap-1.5">
+          <Badge color="reviewed">確認済</Badge>
         </span>
         <span className="flex items-center gap-1.5">
           <span className="inline-block w-3 h-3 rounded-full ring-2 ring-today-ring" />
@@ -130,7 +167,9 @@ export function DayShiftList({ date, shifts }: { date: string; shifts: Shift[] }
       ) : (
         shifts.map((s) => (
           <div key={s.id} className="flex items-start gap-2 p-3 rounded-lg bg-gray-50">
-            <Badge color={s.status === 'confirmed' ? 'confirmed' : 'plan'}>{s.status === 'confirmed' ? '確定' : '予定'}</Badge>
+            <Badge color={s.status === 'confirmed' ? 'confirmed' : s.status === 'reviewed' ? 'reviewed' : 'plan'}>
+              {s.status === 'confirmed' ? '確定' : s.status === 'reviewed' ? '確認済' : '予定'}
+            </Badge>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-gray-900">{s.memberName}</p>
               <p className="text-sm text-gray-600">{s.subject}</p>

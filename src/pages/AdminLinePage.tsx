@@ -5,11 +5,12 @@ import { AdminLayout } from '../components/AdminLayout';
 import { useData } from '../contexts/DataContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
-import { Card, Button, Textarea, Select, Badge } from '../components/ui';
-import { Send, Bell, MessageCircle, Megaphone, Users, Info, Trash2, Wifi, WifiOff } from 'lucide-react';
+import { Card, Button, Textarea, Select, Badge, Modal } from '../components/ui';
+import { Send, Bell, MessageCircle, Megaphone, Users, Info, Trash2, Wifi, WifiOff, CalendarDays } from 'lucide-react';
 import { callLineApi, subscribeLineConfig, deleteGroupId } from '../lib/db';
 import { isFirebaseConfigured, API_BASE_URL } from '../lib/firebase';
 import { formatDateJP, todayStr } from '../lib/utils';
+import { MonthCalendar, DayShiftList } from '../components/MonthCalendar';
 
 export function AdminLinePage() {
   const { members, shifts } = useData();
@@ -29,6 +30,8 @@ export function AdminLinePage() {
   // GID管理
   const [groupId, setGroupId] = useState<string | null | undefined>(undefined);
   const [deletingGid, setDeletingGid] = useState(false);
+  // カレンダー
+  const [calSelected, setCalSelected] = useState<string | null>(null);
 
   // LINEグループID購読
   useEffect(() => {
@@ -40,7 +43,6 @@ export function AdminLinePage() {
 
   const todayShifts = shifts.filter((s) => s.date === todayStr());
   const lineMembers = members.filter((m) => m.lineUserId);
-  // admin自身の登録LINE ID
   const adminMember = members.find((m) => m.name === adminName);
   const adminLineId = adminMember?.lineUserId;
 
@@ -87,6 +89,8 @@ export function AdminLinePage() {
       setDeletingGid(false);
     }
   };
+
+  const calSelectedShifts = calSelected ? shifts.filter((s) => s.date === calSelected) : [];
 
   return (
     <AdminLayout>
@@ -264,6 +268,23 @@ export function AdminLinePage() {
           <Info className="w-3.5 h-3.5" />トークン等の秘匿情報はフロントに置かず、Heroku側のAPIで取り扱います。フロントは fetch でエンドポイントを呼ぶだけです。
         </p>
       </Card>
+
+      {/* 全体シフトカレンダー */}
+      <div className="mt-6">
+        <h2 className="text-sm font-semibold text-gray-700 mb-3 flex items-center gap-2">
+          <CalendarDays className="w-4 h-4" />全体シフトカレンダー
+        </h2>
+        <MonthCalendar shifts={shifts} onSelectDate={setCalSelected} />
+      </div>
+
+      {/* カレンダー日付クリック時のシフト詳細 */}
+      <Modal
+        open={calSelected !== null}
+        onClose={() => setCalSelected(null)}
+        title={calSelected ? formatDateJP(calSelected) : ''}
+      >
+        {calSelected && <DayShiftList date={calSelected} shifts={calSelectedShifts} />}
+      </Modal>
     </AdminLayout>
   );
 }

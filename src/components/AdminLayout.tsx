@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
-import { ClipboardList, Send, MessageSquare, BookOpen, LogOut, ShieldCheck } from 'lucide-react';
+import { ClipboardList, Send, MessageSquare, BookOpen, LogOut, ShieldCheck, UserCircle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 const navItems = [
@@ -21,6 +21,12 @@ export function AdminLayout({ children }: { children: ReactNode }) {
     navigate('/admin-top');
   };
 
+  // サインアウトしてからユーザーログイン画面へ（必ずパスワードを要求）
+  const handleGoToUser = async () => {
+    await signOut();
+    navigate('/login');
+  };
+
   return (
     <div className="min-h-screen bg-admin-50 bg-slate-50">
       <header className="sticky top-0 z-30 bg-slate-900 text-white border-b border-slate-800">
@@ -32,9 +38,19 @@ export function AdminLayout({ children }: { children: ReactNode }) {
             <span className="font-semibold">シフト管理 — 管理者</span>
             {name && <span className="text-xs text-slate-300 bg-slate-700 px-2 py-0.5 rounded-full">{name}</span>}
           </div>
-          <button onClick={handleSignOut} className="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800" title="ログアウト">
-            <LogOut className="w-4 h-4" />
-          </button>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={handleGoToUser}
+              className="flex items-center gap-1.5 text-slate-400 hover:text-white px-2 py-1.5 rounded-lg hover:bg-slate-800 text-xs"
+              title="ユーザーサイトへ（再ログイン必要）"
+            >
+              <UserCircle className="w-4 h-4" />
+              <span className="hidden sm:inline">ユーザーへ</span>
+            </button>
+            <button onClick={handleSignOut} className="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800" title="ログアウト">
+              <LogOut className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       </header>
 

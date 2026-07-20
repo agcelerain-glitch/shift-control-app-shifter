@@ -134,7 +134,7 @@ export const mockStore = {
     if (!s) return 'conflict';
     const before = { ...s };
     if (p.action === 'approve') s.status = 'confirmed';
-    if (p.action === 'deny') s.status = 'plan';
+    if (p.action === 'deny') s.status = 'reviewed';
     if (p.action === 'adjust' && p.adjustFields) Object.assign(s, p.adjustFields, { status: 'confirmed' });
     s.version += 1;
     s.updatedAt = Date.now();

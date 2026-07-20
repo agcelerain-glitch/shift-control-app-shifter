@@ -209,7 +209,7 @@ export async function approveShift(p: ApproveParams): Promise<'ok' | 'conflict'>
         version: beforeState.version + 1,
       };
       if (p.action === 'approve') next.status = 'confirmed';
-      if (p.action === 'deny') next.status = 'plan';
+      if (p.action === 'deny') next.status = 'reviewed';
       if (p.action === 'adjust' && p.adjustFields) {
         Object.assign(next, p.adjustFields);
         next.status = 'confirmed';

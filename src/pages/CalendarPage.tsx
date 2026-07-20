@@ -1,31 +1,31 @@
-// / ユーザーカレンダー: 全ユーザーのシフトを月表示。名前・ステータスでフィルタ可能
+// / ユーザーカレンダー: デフォルトは自分のシフト。プルダウンで全員表示（グラデーション色付き）
 
 import { useMemo, useState } from 'react';
 import { UserLayout } from '../components/UserLayout';
 import { MonthCalendar, DayShiftList } from '../components/MonthCalendar';
+import type { MemberColor } from '../components/MonthCalendar';
 import { useData } from '../contexts/DataContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Modal, Select } from '../components/ui';
 import { formatDateJP } from '../lib/utils';
 
+function memberColorForIndex(i: number, total: number): MemberColor {
+  const hue = Math.round((i * 360) / Math.max(total, 1)) % 360;
+  return {
+    planBg: `hsl(${hue}, 55%, 88%)`,
+    planText: `hsl(${hue}, 60%, 28%)`,
+    confirmedBg: `hsl(${hue}, 65%, 50%)`,
+    confirmedText: 'white',
+    reviewedBg: 'rgb(235, 235, 235)',
+    reviewedText: 'rgb(150, 150, 150)',
+  };
+}
+
 export function CalendarPage() {
   const { shifts, members } = useData();
   const { name: myName } = useAuth();
   const [selected, setSelected] = useState<string | null>(null);
-  const [filterName, setFilterName] = useState<string>('all');
-  const [filterStatus, setFilterStatus] = useState<'all' | 'plan' | 'confirmed'>('all');
-
-  const filtered = useMemo(() => {
-    let list = shifts;
-    if (filterName !== 'all') list = list.filter((s) => s.memberName === filterName);
-    if (filterStatus !== 'all') list = list.filter((s) => s.status === filterStatus);
-    return list;
-  }, [shifts, filterName, filterStatus]);
-
-  const selectedShifts = useMemo(
-    () => (selected ? filtered.filter((s) => s.date === selected) : []),
-    [filtered, selected],
-  );
+  const [filterName, setFilterName] = useState<'self' | 'all'>('self');
 
   // メンバーリスト: Firestoreのmembersに加え、shiftsに存在する名前も追加
   const memberNames = useMemo(() => {
@@ -34,38 +34,48 @@ export function CalendarPage() {
     return [...new Set([...fromMembers, ...fromShifts])].sort((a, b) => a.localeCompare(b, 'ja'));
   }, [members, shifts]);
 
+  const filtered = useMemo(() => {
+    if (filterName === 'self' && myName) return shifts.filter((s) => s.memberName === myName);
+    return shifts;
+  }, [shifts, filterName, myName]);
+
+  const selectedShifts = useMemo(
+    () => (selected ? filtered.filter((s) => s.date === selected) : []),
+    [filtered, selected],
+  );
+
+  // 全員表示時のみ名前ごとのグラデーション色を生成
+  const memberColors = useMemo<Record<string, MemberColor> | undefined>(() => {
+    if (filterName !== 'all') return undefined;
+    const map: Record<string, MemberColor> = {};
+    memberNames.forEach((name, i) => {
+      map[name] = memberColorForIndex(i, memberNames.length);
+    });
+    return map;
+  }, [filterName, memberNames]);
+
   return (
     <UserLayout>
       <div className="mb-4">
         <h1 className="text-lg font-bold text-gray-900">シフトカレンダー</h1>
-        <p className="text-sm text-gray-500">全メンバーのシフトを確認できます</p>
+        <p className="text-sm text-gray-500">
+          {filterName === 'self' ? '自分のシフトを表示中' : '全員のシフトを表示中（グラデーション：メンバー別色）'}
+        </p>
       </div>
 
       {/* フィルタバー */}
-      <div className="flex gap-2 mb-4 flex-wrap">
+      <div className="flex gap-2 mb-4">
         <Select
           value={filterName}
-          onChange={(e) => setFilterName(e.target.value)}
+          onChange={(e) => setFilterName(e.target.value as 'self' | 'all')}
           className="w-auto text-sm"
         >
+          <option value="self">自分（{myName ?? '—'}）</option>
           <option value="all">全員</option>
-          <option value={myName ?? ''}>自分（{myName}）</option>
-          {memberNames.filter((n) => n !== myName).map((n) => (
-            <option key={n} value={n}>{n}</option>
-          ))}
-        </Select>
-        <Select
-          value={filterStatus}
-          onChange={(e) => setFilterStatus(e.target.value as typeof filterStatus)}
-          className="w-auto text-sm"
-        >
-          <option value="all">予定＋確定</option>
-          <option value="plan">予定のみ</option>
-          <option value="confirmed">確定のみ</option>
         </Select>
       </div>
 
-      <MonthCalendar shifts={filtered} onSelectDate={setSelected} />
+      <MonthCalendar shifts={filtered} onSelectDate={setSelected} memberColors={memberColors} />
 
       <Modal
         open={selected !== null}

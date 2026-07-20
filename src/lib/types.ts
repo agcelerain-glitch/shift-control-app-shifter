@@ -2,7 +2,7 @@
 
 export type Role = 'user' | 'admin';
 
-export type ShiftStatus = 'plan' | 'confirmed';
+export type ShiftStatus = 'plan' | 'confirmed' | 'reviewed';
 export type TimeType = 'none' | 'time' | 'template' | 'other';
 export type TemplateCode = 'A' | 'B' | 'C' | 'D';
 

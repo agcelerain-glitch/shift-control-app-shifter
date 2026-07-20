@@ -16,10 +16,10 @@ type Mode = 'none' | 'apply' | 'other';
 type SubjectMode = TemplateCode | 'time';
 
 const SUBJECT_OPTIONS: { value: SubjectMode; label: string; hasTime: boolean }[] = [
-  { value: 'A', label: '件名A帯', hasTime: false },
-  { value: 'B', label: '件名B帯', hasTime: false },
-  { value: 'C', label: '件名C帯', hasTime: false },
-  { value: 'D', label: '件名D帯', hasTime: false },
+  { value: 'A', label: 'A帯', hasTime: false },
+  { value: 'B', label: 'B帯', hasTime: false },
+  { value: 'C', label: 'C帯', hasTime: false },
+  { value: 'D', label: 'D帯', hasTime: false },
   { value: 'time', label: '時間指定', hasTime: true },
 ];
 
@@ -76,7 +76,7 @@ export function RequestPage() {
 
   const subjectLabel = () => {
     if (subjectMode === 'time') return `時間指定 ${name ?? ''}`;
-    return `件名${TEMPLATE_LABELS[subjectMode as TemplateCode]} ${name ?? ''}`;
+    return `${TEMPLATE_LABELS[subjectMode as TemplateCode]} ${name ?? ''}`;
   };
 
   const checkDup = async (d: string) => {
@@ -108,8 +108,8 @@ export function RequestPage() {
       if (!date) { toast.show('日付を選択してください', 'error'); return; }
       setSubmitting(true);
       try {
-        await createShift({ memberName: name, date, timeType: 'other', subject: '給料受取のみ' });
-        toast.show('「その他（給料受取のみ）」を申請しました', 'success');
+        await createShift({ memberName: name, date, timeType: 'other', subject: '給料受取など' });
+        toast.show('「その他（給料受取など）」を申請しました', 'success');
         resetForm();
       } catch (e) { toast.show(`申請に失敗しました: ${(e as Error).message}`, 'error'); }
       finally { setSubmitting(false); }
@@ -169,7 +169,7 @@ export function RequestPage() {
   const modeCards: { id: Mode; label: string; desc: string; icon: typeof Ban; color: string }[] = [
     { id: 'none', label: '不可（シフトなし）', desc: '指定週まるごと入れません', icon: Ban, color: 'border-gray-200 hover:border-gray-400' },
     { id: 'apply', label: 'シフト申請', desc: '件名・時間を指定して申請', icon: Clock, color: 'border-brand-200 hover:border-brand-400' },
-    { id: 'other', label: 'その他（給料受取のみ）', desc: '出勤せず給料のみ受取', icon: Wallet, color: 'border-amber-200 hover:border-amber-400' },
+    { id: 'other', label: 'その他（給料受取など）', desc: '出勤せず給料のみ受取', icon: Wallet, color: 'border-amber-200 hover:border-amber-400' },
   ];
 
   return (

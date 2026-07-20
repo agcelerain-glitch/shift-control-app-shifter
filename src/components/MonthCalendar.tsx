@@ -3,8 +3,18 @@
 import { useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import type { Shift } from '../lib/types';
+import { TEMPLATE_TIMES } from '../lib/types';
 import { getMonthGrid, getMonthLabel, todayStr, formatDateJP } from '../lib/utils';
 import { Badge } from './ui';
+
+function getTimeLabel(s: Shift): string {
+  if (s.timeType === 'time' && s.timeStart && s.timeEnd) return `${s.timeStart}〜${s.timeEnd}`;
+  if (s.timeType === 'template' && s.template && TEMPLATE_TIMES[s.template]) {
+    const t = TEMPLATE_TIMES[s.template];
+    return `${t.start}〜${t.end}`;
+  }
+  return '';
+}
 
 const WEEK = ['日', '月', '火', '水', '木', '金', '土'];
 
@@ -126,7 +136,7 @@ export function MonthCalendar({
                   const { style, cls } = getShiftStyle(s, memberColors?.[s.memberName]);
                   const label = isUnavailable
                     ? `${s.memberName.split(' ')[0]} 不可`
-                    : `${s.memberName.split(' ')[0]}・${s.subject}`;
+                    : s.subject;
                   return (
                     <div
                       key={s.id}
@@ -177,18 +187,24 @@ export function DayShiftList({ date, shifts }: { date: string; shifts: Shift[] }
       ) : (
         shifts.map((s) => {
           const isUnavailable = s.timeType === 'none';
+          const timeLabel = getTimeLabel(s);
           return (
             <div key={s.id} className="flex items-start gap-2 p-3 rounded-lg bg-gray-50">
               <Badge color={
                 isUnavailable ? 'gray' :
+                s.status === 'delete_requested' ? 'red' :
                 s.status === 'confirmed' ? 'confirmed' :
                 s.status === 'reviewed'  ? 'reviewed'  : 'plan'
               }>
-                {isUnavailable ? '不可' : s.status === 'confirmed' ? '確定' : s.status === 'reviewed' ? '確認済' : '予定'}
+                {isUnavailable ? '不可' : s.status === 'delete_requested' ? '削除依頼' : s.status === 'confirmed' ? '確定' : s.status === 'reviewed' ? '確認済' : '予定'}
               </Badge>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-gray-900">{s.memberName}</p>
-                {!isUnavailable && <p className="text-sm text-gray-600">{s.subject}</p>}
+                <p className="text-sm font-medium text-gray-900">
+                  {isUnavailable ? s.memberName : s.subject}
+                </p>
+                {!isUnavailable && timeLabel && (
+                  <p className="text-xs text-gray-500">{timeLabel}</p>
+                )}
                 {s.place && <p className="text-xs text-gray-500">場所: {s.place}</p>}
               </div>
             </div>

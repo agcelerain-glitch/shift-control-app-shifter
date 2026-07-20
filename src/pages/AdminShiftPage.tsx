@@ -7,7 +7,7 @@ import { useToast } from '../contexts/ToastContext';
 import { useAuth } from '../contexts/AuthContext';
 import { Card, Button, Badge, Input, Select, Modal, EmptyState } from '../components/ui';
 import {
-  CheckCircle2, XCircle, Sliders, RotateCcw, Users, MessageCircle, MapPin, Clock, User as UserIcon,
+  CheckCircle2, XCircle, Sliders, RotateCcw, Users, MapPin, Clock, User as UserIcon,
   CalendarDays, Calendar, Hash, ChevronDown, ChevronRight, History, Trash2, Plus, Minus,
 } from 'lucide-react';
 import { formatDateJP, formatDateTimeJP, isPast7Days, weekdayJP, todayStr } from '../lib/utils';
@@ -62,6 +62,7 @@ export function AdminShiftPage() {
   const [savingLineId, setSavingLineId] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deletingMember, setDeletingMember] = useState(false);
+  const [summarySelectedDate, setSummarySelectedDate] = useState<string | null>(null);
 
   // 承認時の場所指定モーダル
   const [approvingShift, setApprovingShift] = useState<Shift | null>(null);
@@ -282,7 +283,11 @@ export function AdminShiftPage() {
         <p className="text-xs font-medium text-gray-500 mb-2">今後7日間の人数</p>
         <div className="flex gap-2 min-w-max">
           {weekSummary.map(({ date, wd, day, isToday, isSun, isSat, confirmed, plan, reviewed, unavailable }) => (
-            <div key={date} className={`flex flex-col items-center px-3 py-2 rounded-xl min-w-[52px] ${isToday ? 'bg-brand-50 ring-1 ring-brand-300' : 'bg-gray-50'}`}>
+            <button
+              key={date}
+              onClick={() => setSummarySelectedDate(date)}
+              className={`flex flex-col items-center px-3 py-2 rounded-xl min-w-[52px] transition hover:ring-2 hover:ring-brand-300 active:scale-95 ${isToday ? 'bg-brand-50 ring-1 ring-brand-300' : 'bg-gray-50 hover:bg-brand-50'}`}
+            >
               <span className={`text-[10px] font-medium ${isSun ? 'text-red-500' : isSat ? 'text-blue-500' : 'text-gray-500'}`}>{wd}</span>
               <span className={`text-sm font-bold ${isToday ? 'text-brand-700' : 'text-gray-800'}`}>{day}</span>
               <div className="mt-1 space-y-0.5 text-[10px] text-center w-full">
@@ -292,7 +297,7 @@ export function AdminShiftPage() {
                 {unavailable > 0 && <div className="bg-slate-100 text-slate-500 rounded px-1">不{unavailable}</div>}
                 {confirmed === 0 && plan === 0 && reviewed === 0 && unavailable === 0 && <div className="text-gray-300">—</div>}
               </div>
-            </div>
+            </button>
           ))}
         </div>
       </Card>
@@ -529,14 +534,7 @@ export function AdminShiftPage() {
             <div className="flex items-center justify-between mb-3">
               <h3 className="font-semibold text-gray-900">{selectedMember}</h3>
               {memberInfo?.lineUserId && (
-                <a
-                  href={`https://line.me/ti/p/~${memberInfo.lineUserId}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-1 text-xs text-green-600 bg-green-50 px-2 py-1 rounded-lg hover:bg-green-100"
-                >
-                  <MessageCircle className="w-3.5 h-3.5" />LINEへ
-                </a>
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full font-medium bg-green-100 text-green-700">LINE済</span>
               )}
             </div>
             <div className="mb-3 text-xs">
@@ -597,6 +595,57 @@ export function AdminShiftPage() {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* 週間サマリー 日付詳細モーダル */}
+      <Modal
+        open={summarySelectedDate !== null}
+        onClose={() => setSummarySelectedDate(null)}
+        title={summarySelectedDate ? `${formatDateJP(summarySelectedDate)} のシフト` : ''}
+      >
+        {summarySelectedDate && (() => {
+          const dayShifts = shifts
+            .filter((s) => s.date === summarySelectedDate && s.timeType !== 'none')
+            .sort((a, b) => {
+              const order: Record<string, number> = { confirmed: 0, plan: 1, reviewed: 2, delete_requested: 3 };
+              return (order[a.status] ?? 9) - (order[b.status] ?? 9) || timeSortVal(a) - timeSortVal(b);
+            });
+          const unavailShifts = shifts.filter((s) => s.date === summarySelectedDate && s.timeType === 'none');
+
+          if (dayShifts.length === 0 && unavailShifts.length === 0) {
+            return <EmptyState icon={<CalendarDays className="w-8 h-8" />} title="この日のシフトはありません" />;
+          }
+          return (
+            <div className="space-y-2">
+              {dayShifts.map((s) => {
+                const tl = timeLabelOf(s);
+                return (
+                  <div key={s.id} className="flex items-start gap-3 p-2.5 rounded-lg bg-gray-50">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-0.5 flex-wrap">
+                        {statusBadge(s)}
+                        <span className="text-sm font-medium text-gray-900">{s.memberName}</span>
+                      </div>
+                      <p className="text-xs text-gray-600">{s.subject}</p>
+                      <div className="flex gap-2 text-xs text-gray-400 mt-0.5">
+                        {tl && <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{tl}</span>}
+                        {s.place && <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{s.place}</span>}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+              {unavailShifts.length > 0 && (
+                <div className="pt-2 border-t border-gray-100">
+                  <p className="text-xs text-gray-400 mb-1">不可申請</p>
+                  {unavailShifts.map((s) => (
+                    <p key={s.id} className="text-xs text-gray-500 py-0.5">{s.memberName}</p>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })()}
       </Modal>
 
       {/* 復元ログモーダル */}

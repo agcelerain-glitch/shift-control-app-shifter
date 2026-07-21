@@ -367,7 +367,10 @@ export function AdminShiftPage() {
                       {s.place && <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{s.place}</span>}
                       {s.headcount && <span className="flex items-center gap-1"><Hash className="w-3 h-3" />{s.headcount}人</span>}
                     </div>
-                    <p className="text-[10px] text-gray-400 mt-1">申請 {formatDateTimeJP(s.createdAt)} / 修正 {formatDateTimeJP(s.updatedAt)} / v{s.version}</p>
+                    <p className="text-[10px] text-gray-400 mt-1">申請 {formatDateTimeJP(s.createdAt)}</p>
+                    {s.version > 1 && (
+                      <p className="text-[10px] text-gray-300 mt-0.5">修正 {formatDateTimeJP(s.updatedAt)} · v{s.version}</p>
+                    )}
                   </div>
                   <div className="flex gap-1.5 shrink-0 flex-wrap">
                     {s.status === 'delete_requested' ? (

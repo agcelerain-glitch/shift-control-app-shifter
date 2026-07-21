@@ -1,6 +1,6 @@
 // データコンテキスト: 認証済み時のみFirestore購読を開始・再接続する
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import {
   subscribeMembers,
   subscribeShifts,
@@ -19,6 +19,7 @@ interface DataCtx {
   approvalLogs: ApprovalLog[];
   loaded: boolean;
   firestoreError: string | null;
+  refresh: () => void;
 }
 
 const Ctx = createContext<DataCtx | null>(null);
@@ -32,6 +33,8 @@ export function DataProvider({ children }: { children: ReactNode }) {
   const [approvalLogs, setApprovalLogs] = useState<ApprovalLog[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [firestoreError, setFirestoreError] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+  const refresh = useCallback(() => setRefreshKey((k) => k + 1), []);
 
   useEffect(() => {
     // 認証初期化中は待つ。未ログインなら購読しない
@@ -76,10 +79,10 @@ export function DataProvider({ children }: { children: ReactNode }) {
     setLoaded(true);
 
     return () => unsubs.forEach((u) => u());
-  }, [role, initializing]); // auth状態が変わるたびに再購読
+  }, [role, initializing, refreshKey]); // auth状態またはrefreshKeyが変わるたびに再購読
 
   return (
-    <Ctx.Provider value={{ members, shifts, boardPublic, boardPrivate, approvalLogs, loaded, firestoreError }}>
+    <Ctx.Provider value={{ members, shifts, boardPublic, boardPrivate, approvalLogs, loaded, firestoreError, refresh }}>
       {children}
     </Ctx.Provider>
   );

@@ -8,7 +8,10 @@ import {
   faCalendarDays, faMessage, faCircleUser, faFileCirclePlus, faBookOpen,
   faArrowRightFromBracket, faCalendarCheck,
 } from '@fortawesome/free-solid-svg-icons';
+import { RefreshCw } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useData } from '../contexts/DataContext';
+import { usePullToRefresh } from '../hooks/usePullToRefresh';
 
 const navItems: { to: string; label: string; icon: IconDefinition; end?: boolean }[] = [
   { to: '/', label: 'カレンダー', icon: faCalendarDays, end: true },
@@ -20,7 +23,9 @@ const navItems: { to: string; label: string; icon: IconDefinition; end?: boolean
 
 export function UserLayout({ children }: { children: ReactNode }) {
   const { name, signOut } = useAuth();
+  const { refresh } = useData();
   const navigate = useNavigate();
+  const { refreshing } = usePullToRefresh(refresh);
 
   const handleSignOut = async () => {
     await signOut();
@@ -81,15 +86,24 @@ export function UserLayout({ children }: { children: ReactNode }) {
         </div>
       </nav>
 
+      {/* プルトゥリフレッシュ インジケーター */}
+      {refreshing && (
+        <div className="fixed top-28 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
+          <div className="w-9 h-9 rounded-full bg-white shadow-cardLg flex items-center justify-center">
+            <RefreshCw className="w-4 h-4 text-brand-500 animate-spin" />
+          </div>
+        </div>
+      )}
+
       <main className="max-w-5xl mx-auto px-4 py-6 animate-fadeIn">{children}</main>
 
       <footer
-        className="mt-8 text-center"
-        style={{ paddingBottom: 'max(1.5rem, calc(1rem + env(safe-area-inset-bottom)))' }}
+        className="mt-16 text-center"
+        style={{ paddingBottom: 'max(2.5rem, calc(1.5rem + env(safe-area-inset-bottom)))' }}
       >
         <button
           onClick={async () => { await signOut(); navigate('/admin-top'); }}
-          className="text-xs text-gray-300 hover:text-gray-500 transition-colors py-2 px-3"
+          className="text-xs text-gray-300 hover:text-gray-500 transition-colors py-3 px-6"
           aria-label="管理者ログインページへ移動"
         >
           管理者ログイン

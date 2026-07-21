@@ -8,7 +8,10 @@ import {
   faClipboardList, faPaperPlane, faMessage, faBookOpen,
   faArrowRightFromBracket, faShieldHalved, faCircleUser,
 } from '@fortawesome/free-solid-svg-icons';
+import { RefreshCw } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useData } from '../contexts/DataContext';
+import { usePullToRefresh } from '../hooks/usePullToRefresh';
 
 const navItems: { to: string; label: string; icon: IconDefinition }[] = [
   { to: '/admin-shift', label: 'シフト調整', icon: faClipboardList },
@@ -19,7 +22,9 @@ const navItems: { to: string; label: string; icon: IconDefinition }[] = [
 
 export function AdminLayout({ children }: { children: ReactNode }) {
   const { signOut, name } = useAuth();
+  const { refresh } = useData();
   const navigate = useNavigate();
+  const { refreshing } = usePullToRefresh(refresh);
 
   const handleSignOut = async () => {
     await signOut();
@@ -87,6 +92,15 @@ export function AdminLayout({ children }: { children: ReactNode }) {
           ))}
         </div>
       </nav>
+
+      {/* プルトゥリフレッシュ インジケーター */}
+      {refreshing && (
+        <div className="fixed top-28 left-1/2 -translate-x-1/2 z-50 pointer-events-none">
+          <div className="w-9 h-9 rounded-full bg-slate-700 shadow-cardLg flex items-center justify-center">
+            <RefreshCw className="w-4 h-4 text-brand-400 animate-spin" />
+          </div>
+        </div>
+      )}
 
       <main className="max-w-6xl mx-auto px-4 py-6 animate-fadeIn">{children}</main>
     </div>

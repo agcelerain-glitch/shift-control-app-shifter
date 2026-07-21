@@ -1,5 +1,6 @@
 // UI基本部品: ボタン・バッジ・入力・カード・モーダル・タブ・空状態
 
+import { useState } from 'react';
 import type { ButtonHTMLAttributes, InputHTMLAttributes, ReactNode, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react';
 import { X } from 'lucide-react';
 
@@ -80,6 +81,46 @@ export function Textarea({ className = '', ...props }: TextareaHTMLAttributes<HT
       className={`w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-400 focus:border-transparent transition ${className}`}
       {...props}
     />
+  );
+}
+
+// フローティングラベル付きテキストエリア: フォーカスまたは入力がある時にラベルが縁上へ移動
+export function FloatTextarea({
+  label,
+  value,
+  onChange,
+  rows = 4,
+  className = '',
+  disabled,
+  ...props
+}: TextareaHTMLAttributes<HTMLTextAreaElement> & { label: string }) {
+  const [focused, setFocused] = useState(false);
+  const floating = focused || (typeof value === 'string' && value.length > 0);
+
+  return (
+    <div className={`relative ${className}`}>
+      <textarea
+        value={value}
+        onChange={onChange}
+        rows={rows}
+        disabled={disabled}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        className={`w-full rounded-lg border px-3 pb-2 pt-6 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-brand-400 focus:border-transparent transition ${
+          focused ? 'border-brand-400' : 'border-gray-300'
+        } disabled:opacity-50 disabled:cursor-not-allowed`}
+        {...props}
+      />
+      <span
+        className={`absolute left-3 pointer-events-none transition-all duration-200 z-10 ${
+          floating
+            ? `top-0 -translate-y-1/2 text-xs font-semibold px-1.5 bg-white ${focused ? 'text-brand-600' : 'text-purple-500'}`
+            : 'top-4 text-sm text-gray-400 font-normal'
+        }`}
+      >
+        {label}
+      </span>
+    </div>
   );
 }
 

@@ -5,7 +5,7 @@ import { AdminLayout } from '../components/AdminLayout';
 import { useData } from '../contexts/DataContext';
 import { useAuth } from '../contexts/AuthContext';
 import { useToast } from '../contexts/ToastContext';
-import { Card, Button, Textarea, Select, Badge, Modal } from '../components/ui';
+import { Card, Button, FloatTextarea, Select, Badge, Modal } from '../components/ui';
 import { Send, Bell, MessageCircle, Megaphone, Users, Info, Trash2, Wifi, WifiOff, CalendarDays } from 'lucide-react';
 import { callLineApi, subscribeLineConfig, deleteGroupId } from '../lib/db';
 import { isFirebaseConfigured, API_BASE_URL } from '../lib/firebase';
@@ -85,7 +85,7 @@ export function AdminLinePage() {
       toast.show('あなたのLINE IDが未登録です。LINEで「名前登録 ' + (adminName ?? 'お名前') + '」と送信してください。', 'error');
       return;
     }
-    await send('/line/dm', { lineUserId: adminLineId, message: selfMsg }, '自分への連絡');
+    await send('/line/dm', { lineUserId: adminLineId, message: selfMsg }, '自分への連絡', () => setSelfMsg(''));
   };
 
   const handleDeleteGid = async () => {
@@ -198,11 +198,12 @@ export function AdminLinePage() {
               <p className="text-xs text-gray-500">グループへシフト情報を一括送信</p>
             </div>
           </div>
-          <Textarea
+          <FloatTextarea
+            label="例: 今週のシフトをお知らせします…"
             rows={4}
             value={shiftMsg}
             onChange={(e) => setShiftMsg(e.target.value)}
-            placeholder="例: 今週のシフトをお知らせします…"
+            disabled={sending}
           />
           <p className="text-[10px] text-gray-400 mt-1.5">送信失敗時は内容を非公開メモに保存してください</p>
           <div className="mt-2 flex justify-end">
@@ -235,7 +236,7 @@ export function AdminLinePage() {
               todayShifts.map((s) => <p key={s.id}>{s.memberName} · {s.subject}</p>)
             )}
           </div>
-          <Textarea rows={3} value={positionMsg} onChange={(e) => setPositionMsg(e.target.value)} placeholder="例: 本日の配置: レジ=山田さん、品出し=佐藤さん" />
+          <FloatTextarea rows={3} label="例: 本日の配置: レジ=山田さん、品出し=佐藤さん" value={positionMsg} onChange={(e) => setPositionMsg(e.target.value)} disabled={sending} />
           <p className="text-[10px] text-gray-400 mt-1.5">送信失敗時は内容を非公開メモに保存してください</p>
           <div className="mt-2 flex justify-end">
             <Button
@@ -268,7 +269,7 @@ export function AdminLinePage() {
               </div>
             </div>
           </div>
-          <Textarea rows={4} value={selfMsg} onChange={(e) => setSelfMsg(e.target.value)} placeholder="自分へのリマインダー…" />
+          <FloatTextarea rows={4} label="自分へのリマインダー…" value={selfMsg} onChange={(e) => setSelfMsg(e.target.value)} disabled={sending} />
           <p className="text-[10px] text-gray-400 mt-1.5">送信失敗時は内容を非公開メモに保存してください</p>
           <div className="mt-2 flex justify-end">
             <Button onClick={sendSelf} disabled={sending || !selfMsg.trim() || !adminLineId}>
@@ -301,10 +302,10 @@ export function AdminLinePage() {
               ))
             )}
           </Select>
-          <Textarea rows={3} value={dmMsg} onChange={(e) => setDmMsg(e.target.value)} placeholder="メッセージ本文…" />
+          <FloatTextarea rows={3} label="メッセージ本文…" value={dmMsg} onChange={(e) => setDmMsg(e.target.value)} disabled={sending} />
           <div className="mt-3 flex justify-end">
             <Button
-              onClick={() => send('/line/dm', { lineUserId: targetMember, message: dmMsg }, '個別チャット')}
+              onClick={() => send('/line/dm', { lineUserId: targetMember, message: dmMsg }, '個別チャット', () => setDmMsg(''))}
               disabled={sending || !targetMember || !dmMsg.trim()}
             >
               <Send className="w-4 h-4" />送信

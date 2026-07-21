@@ -62,7 +62,7 @@ export function Badge({ children, color = 'gray', className = '' }: { children: 
     blue: 'bg-brand-100 text-brand-700',
     red: 'bg-red-100 text-red-700',
   }[color];
-  return <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${cls} ${className}`}>{children}</span>;
+  return <span data-badge className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${cls} ${className}`}>{children}</span>;
 }
 
 export function Input({ className = '', ...props }: InputHTMLAttributes<HTMLInputElement>) {

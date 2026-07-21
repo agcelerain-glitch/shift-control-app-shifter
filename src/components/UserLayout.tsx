@@ -42,8 +42,9 @@ export function UserLayout({ children }: { children: ReactNode }) {
             {name && <span className="text-sm text-gray-600 hidden sm:inline">{name}さん</span>}
             <button
               onClick={handleSignOut}
-              className="text-gray-400 hover:text-red-500 p-1.5 rounded-lg hover:bg-gray-100 transition-all duration-150"
+              className="text-gray-400 hover:text-red-500 p-2 rounded-lg hover:bg-gray-100 transition-all duration-150"
               title="ログアウト"
+              aria-label="ログアウト"
             >
               <FontAwesomeIcon icon={faArrowRightFromBracket} className="w-4 h-4" />
             </button>
@@ -82,10 +83,14 @@ export function UserLayout({ children }: { children: ReactNode }) {
 
       <main className="max-w-5xl mx-auto px-4 py-6 animate-fadeIn">{children}</main>
 
-      <footer className="mt-8 pb-6 text-center">
+      <footer
+        className="mt-8 text-center"
+        style={{ paddingBottom: 'max(1.5rem, calc(1rem + env(safe-area-inset-bottom)))' }}
+      >
         <button
           onClick={async () => { await signOut(); navigate('/admin-top'); }}
-          className="text-xs text-gray-300 hover:text-gray-500 transition-colors"
+          className="text-xs text-gray-300 hover:text-gray-500 transition-colors py-2 px-3"
+          aria-label="管理者ログインページへ移動"
         >
           管理者ログイン
         </button>

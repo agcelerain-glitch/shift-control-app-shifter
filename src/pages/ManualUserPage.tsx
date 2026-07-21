@@ -2,8 +2,9 @@
 
 import type { ReactNode } from 'react';
 import { UserLayout } from '../components/UserLayout';
-import { Card } from '../components/ui';
-import { CalendarDays, MessageSquare, User, FilePlus, Layers, Ban, Wallet, AlertTriangle } from 'lucide-react';
+import { Card, Badge } from '../components/ui';
+import { CalendarDays, MessageSquare, User, FilePlus, Layers, Ban, Wallet, AlertTriangle, Palette } from 'lucide-react';
+import { useColorTheme, THEMES, THEME_LABELS } from '../hooks/useColorTheme';
 
 type IconType = typeof CalendarDays;
 
@@ -35,6 +36,9 @@ function SectionCard({
 }
 
 export function ManualUserPage() {
+  const { theme, cycleTheme } = useColorTheme();
+  const nextTheme = THEMES[(THEMES.indexOf(theme) + 1) % THEMES.length];
+
   return (
     <UserLayout>
       <div className="mb-4">
@@ -104,6 +108,28 @@ export function ManualUserPage() {
 
         <SectionCard icon={Wallet} title="その他（給料受取のみ）">
           出勤はしないが<strong>給料を受け取りたい日</strong>がある場合に申請します。日付を選んで送信するだけです。
+        </SectionCard>
+
+        <SectionCard icon={Palette} title="表示カラー設定">
+          ステータスバッジ（予定・確定）の色を変更できます。色覚特性がある方や視認性を上げたい方にご活用ください。設定はこの端末に保存されます。
+          <div className="mt-3 flex items-center gap-3 flex-wrap">
+            <button
+              onClick={cycleTheme}
+              aria-label="表示カラーを切り替える"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl border-2 border-brand-300 bg-brand-50 text-brand-700 font-medium text-sm hover:bg-brand-100 active:scale-95 transition-all"
+            >
+              <Palette className="w-4 h-4" />
+              <span>現在: {THEME_LABELS[theme]}</span>
+              <span className="text-xs text-brand-400">→ {THEME_LABELS[nextTheme]}</span>
+            </button>
+            <div className="flex gap-2">
+              <Badge color="plan">予定</Badge>
+              <Badge color="confirmed">確定</Badge>
+            </div>
+          </div>
+          <p className="text-xs text-gray-400 mt-2">
+            通常 → カラー調整（橙・青系）→ ハイコントラスト → 通常 の順でループします。
+          </p>
         </SectionCard>
 
       </div>

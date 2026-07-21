@@ -332,8 +332,9 @@ export function RequestPage() {
                     <button
                       onClick={() => handleCancel(s.id, s.version, s.subject)}
                       disabled={canceling === s.id}
-                      className="text-gray-300 hover:text-red-500 p-1 rounded hover:bg-red-50 transition-colors"
+                      className="text-gray-300 hover:text-red-500 p-2 rounded-lg hover:bg-red-50 transition-colors"
                       title="申請取消"
+                      aria-label="申請を取り消す"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                     </button>

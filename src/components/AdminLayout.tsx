@@ -50,16 +50,18 @@ export function AdminLayout({ children }: { children: ReactNode }) {
           <div className="flex items-center gap-1">
             <button
               onClick={handleGoToUser}
-              className="flex items-center gap-1.5 text-slate-400 hover:text-white px-2 py-1.5 rounded-lg hover:bg-slate-800 text-xs transition-all duration-150"
+              className="flex items-center gap-1.5 text-slate-400 hover:text-white px-2 py-2 rounded-lg hover:bg-slate-800 text-xs transition-all duration-150"
               title="ユーザーサイトへ（再ログイン必要）"
+              aria-label="ユーザーサイトへ移動（再ログインが必要）"
             >
               <FontAwesomeIcon icon={faCircleUser} className="w-4 h-4" />
               <span className="hidden sm:inline">ユーザーへ</span>
             </button>
             <button
               onClick={handleSignOut}
-              className="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800 transition-all duration-150"
+              className="text-slate-400 hover:text-white p-2 rounded-lg hover:bg-slate-800 transition-all duration-150"
               title="ログアウト"
+              aria-label="ログアウト"
             >
               <FontAwesomeIcon icon={faArrowRightFromBracket} className="w-4 h-4" />
             </button>

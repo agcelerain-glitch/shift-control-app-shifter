@@ -74,12 +74,12 @@ function ShiftCard({
             <Copy className="w-3.5 h-3.5" />1日分
           </Button>
           {shift.status === 'plan' && onCancel && (
-            <Button size="sm" variant="secondary" className="ml-auto text-red-500 hover:bg-red-50" onClick={() => onCancel(shift)}>
+            <Button size="sm" variant="secondary" className="ml-auto text-red-500 hover:bg-red-50" onClick={() => onCancel(shift)} aria-label={`${formatDateJP(shift.date)}の申請を取り消す`}>
               <Trash2 className="w-3.5 h-3.5" />申請取消
             </Button>
           )}
           {shift.status === 'confirmed' && onDeleteRequest && (
-            <Button size="sm" variant="secondary" className="ml-auto text-rose-500 hover:bg-rose-50" onClick={() => onDeleteRequest(shift)}>
+            <Button size="sm" variant="secondary" className="ml-auto text-rose-500 hover:bg-rose-50" onClick={() => onDeleteRequest(shift)} aria-label={`${formatDateJP(shift.date)}の削除を管理者に依頼する`}>
               <AlertTriangle className="w-3.5 h-3.5" />削除依頼
             </Button>
           )}

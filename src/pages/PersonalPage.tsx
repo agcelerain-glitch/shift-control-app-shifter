@@ -41,7 +41,7 @@ function ShiftCard({
       <div className="flex items-start justify-between gap-3">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1.5">
-            <span className={`text-sm font-medium ${weekdayJP(shift.date) === '日' ? 'text-red-500' : weekdayJP(shift.date) === '土' ? 'text-blue-500' : 'text-gray-700'}`}>
+            <span className={`text-sm font-medium underline underline-offset-2 decoration-1 ${weekdayJP(shift.date) === '日' ? 'text-red-500 decoration-red-300' : weekdayJP(shift.date) === '土' ? 'text-blue-500 decoration-blue-300' : 'text-gray-700 decoration-gray-300'}`}>
               {formatDateJP(shift.date)}
             </span>
             <Badge color={

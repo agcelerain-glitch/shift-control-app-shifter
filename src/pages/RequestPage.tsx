@@ -56,6 +56,7 @@ export function RequestPage() {
   const [timeStart, setTimeStart] = useState('09:00');
   const [timeEnd, setTimeEnd] = useState('17:00');
   const [place, setPlace] = useState('');
+  const [placeCustom, setPlaceCustom] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [canceling, setCanceling] = useState<string | null>(null);
   const [dupWarning, setDupWarning] = useState<string | null>(null);
@@ -78,6 +79,8 @@ export function RequestPage() {
     setDupWarning(existing ? `${formatDateJP(d)} は既に申請済みです（${existing.subject}）` : null);
   };
 
+  const resolvedPlace = () => (place === '__other__' ? placeCustom.trim() : place);
+
   const handleSubmit = async () => {
     if (!name) return;
 
@@ -87,7 +90,7 @@ export function RequestPage() {
       try {
         const dates = getWeekDates(weekRange.start);
         await Promise.all(
-          dates.map((d) => createShift({ memberName: name, date: d, timeType: 'none', subject: '不可（シフトなし）' }))
+          dates.map((d) => createShift({ memberName: name, date: d, timeType: 'none', subject: `不可（シフトなし） ${name ?? ''}`.trim() }))
         );
         toast.show(`${formatDateJP(weekRange.start)}〜${formatDateJP(weekRange.end)} を「不可」で申請しました`, 'success');
         resetForm();
@@ -100,7 +103,7 @@ export function RequestPage() {
       if (!date) { toast.show('日付を選択してください', 'error'); return; }
       setSubmitting(true);
       try {
-        await createShift({ memberName: name, date, timeType: 'other', subject: '給料受取など' });
+        await createShift({ memberName: name, date, timeType: 'other', subject: `給料受取など ${name ?? ''}`.trim() });
         toast.show('「その他（給料受取など）」を申請しました', 'success');
         resetForm();
       } catch (e) { toast.show(`申請に失敗しました: ${(e as Error).message}`, 'error'); }
@@ -116,6 +119,7 @@ export function RequestPage() {
     }
     setSubmitting(true);
     try {
+      const placeVal = resolvedPlace();
       if (subjectMode === 'time') {
         await createShift({
           memberName: name,
@@ -124,7 +128,7 @@ export function RequestPage() {
           timeStart,
           timeEnd,
           subject: subjectLabel(),
-          ...(place.trim() && { place: place.trim() }),
+          ...(placeVal && { place: placeVal }),
         });
       } else {
         await createShift({
@@ -133,7 +137,7 @@ export function RequestPage() {
           timeType: 'template',
           template: subjectMode as TemplateCode,
           subject: subjectLabel(),
-          ...(place.trim() && { place: place.trim() }),
+          ...(placeVal && { place: placeVal }),
         });
       }
       toast.show('シフトを申請しました', 'success');
@@ -155,12 +159,12 @@ export function RequestPage() {
   };
 
   const resetForm = () => {
-    setDate(''); setPlace(''); setDupWarning(null);
+    setDate(''); setPlace(''); setPlaceCustom(''); setDupWarning(null);
   };
 
   const modeCards: { id: Mode; label: string; desc: string; icon: typeof Ban; color: string }[] = [
-    { id: 'none', label: '不可（シフトなし）', desc: '指定週まるごと入れません', icon: Ban, color: 'border-gray-200 hover:border-gray-400' },
     { id: 'apply', label: 'シフト申請', desc: '件名・時間を指定して申請', icon: Clock, color: 'border-brand-200 hover:border-brand-400' },
+    { id: 'none', label: '不可（シフトなし）', desc: '指定週まるごと入れません', icon: Ban, color: 'border-gray-200 hover:border-gray-400' },
     { id: 'other', label: 'その他（給料受取など）', desc: '出勤せず給料のみ受取', icon: Wallet, color: 'border-amber-200 hover:border-amber-400' },
   ];
 
@@ -259,10 +263,20 @@ export function RequestPage() {
 
               <div className={currentOption.hasTime ? '' : 'sm:col-span-2'}>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">場所（任意）</label>
-                <Select value={place} onChange={(e) => setPlace(e.target.value)}>
+                <Select value={place} onChange={(e) => { setPlace(e.target.value); if (e.target.value !== '__other__') setPlaceCustom(''); }}>
                   <option value="">指定なし</option>
                   {PLACE_OPTIONS.map((p) => <option key={p} value={p}>{p}</option>)}
+                  <option value="__other__">その他（自由記入）</option>
                 </Select>
+                {place === '__other__' && (
+                  <Input
+                    className="mt-2"
+                    placeholder="場所を入力（例: 他店ヘルプ）"
+                    value={placeCustom}
+                    onChange={(e) => setPlaceCustom(e.target.value)}
+                    maxLength={30}
+                  />
+                )}
               </div>
             </>
           )}

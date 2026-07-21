@@ -214,8 +214,8 @@ export function RequestPage() {
                       onChange={(e) => updateNoneDate(idx, e.target.value)}
                     />
                     {d && (
-                      <p className={`text-xs mt-1 ${dayColor(d)}`}>
-                        {formatDateJP(d)}（{weekdayJP(d)}）
+                      <p className={`text-xs mt-1 font-medium ${dayColor(d)}`}>
+                        （{weekdayJP(d)}）
                       </p>
                     )}
                   </div>

@@ -39,9 +39,13 @@ export function AdminLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="min-h-screen bg-admin-50 bg-slate-50">
-      <header className="sticky top-0 z-30 bg-slate-900 text-white border-b border-slate-800">
+      <header className="sticky top-0 z-30 bg-slate-900 text-white border-b border-slate-700 shadow-md">
         <div className="max-w-6xl mx-auto px-4 h-14 flex items-center justify-between">
-          <div className="flex items-center gap-2">
+          <button
+            onClick={() => navigate('/admin-shift')}
+            className="flex items-center gap-2 hover:opacity-75 transition-opacity"
+            aria-label="シフト調整ページへ"
+          >
             <div className="w-8 h-8 rounded-lg bg-slate-700 flex items-center justify-center shadow-sm">
               <FontAwesomeIcon icon={faShieldHalved} className="w-4 h-4" />
             </div>
@@ -51,7 +55,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
                 {name}
               </span>
             )}
-          </div>
+          </button>
           <div className="flex items-center gap-1">
             <button
               onClick={handleGoToUser}
@@ -74,19 +78,21 @@ export function AdminLayout({ children }: { children: ReactNode }) {
         </div>
       </header>
 
-      <nav className="sticky top-14 z-20 bg-slate-800 border-b border-slate-700">
-        <div className="max-w-6xl mx-auto px-2 flex gap-1 overflow-x-auto">
+      <nav className="sticky top-14 z-20 bg-slate-950 border-b-2 border-slate-700 shadow-[0_2px_10px_rgba(0,0,0,0.3)]">
+        <div className="max-w-6xl mx-auto px-2 pt-1.5 flex gap-1 overflow-x-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
           {navItems.map((n) => (
             <NavLink
               key={n.to}
               to={n.to}
               className={({ isActive }) =>
-                `flex items-center gap-1.5 px-3 py-2.5 text-sm font-medium whitespace-nowrap transition-all duration-150 ${
-                  isActive ? 'text-white border-b-2 border-brand-400' : 'text-slate-400 hover:text-white'
+                `flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium whitespace-nowrap transition-all duration-150 rounded-t-xl ${
+                  isActive
+                    ? 'bg-slate-800 text-white shadow-[0_-2px_8px_rgba(0,0,0,0.4),0_2px_0_#020617] border border-slate-600 border-b-0'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60'
                 }`
               }
             >
-              <FontAwesomeIcon icon={n.icon} className="w-4 h-4" />
+              <FontAwesomeIcon icon={n.icon} className="w-3.5 h-3.5" />
               {n.label}
             </NavLink>
           ))}

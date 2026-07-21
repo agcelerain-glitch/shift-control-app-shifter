@@ -8,11 +8,37 @@ import { useToast } from '../contexts/ToastContext';
 import { Button, Input } from '../components/ui';
 import { isFirebaseConfigured } from '../lib/firebase';
 
+const SAVE_FLAG_KEY = 'shift_admin_save_pw';
+const SAVED_PW_KEY = 'shift_admin_saved_pw';
+const LOGIN_LOG_KEY = 'shift_admin_login_log';
+
+function loadSavedPassword(): string {
+  try {
+    if (localStorage.getItem(SAVE_FLAG_KEY) === 'true') {
+      return localStorage.getItem(SAVED_PW_KEY) ?? '';
+    }
+  } catch { /* localStorageが使えない環境（プライベートモードなど） */ }
+  return '';
+}
+
+function recordLoginLog() {
+  try {
+    const raw = localStorage.getItem(LOGIN_LOG_KEY);
+    const log: { at: string }[] = raw ? JSON.parse(raw) : [];
+    log.unshift({ at: new Date().toISOString() });
+    if (log.length > 10) log.splice(10);
+    localStorage.setItem(LOGIN_LOG_KEY, JSON.stringify(log));
+  } catch { /* 記録失敗は無視 */ }
+}
+
 export function AdminLoginPage() {
   const { signInAdmin } = useAuth();
   const toast = useToast();
   const navigate = useNavigate();
-  const [password, setPassword] = useState('');
+  const [password, setPassword] = useState(() => loadSavedPassword());
+  const [savePassword, setSavePassword] = useState(() => {
+    try { return localStorage.getItem(SAVE_FLAG_KEY) === 'true'; } catch { return false; }
+  });
   const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -21,6 +47,16 @@ export function AdminLoginPage() {
     setLoading(true);
     try {
       await signInAdmin(password);
+      try {
+        if (savePassword) {
+          localStorage.setItem(SAVE_FLAG_KEY, 'true');
+          localStorage.setItem(SAVED_PW_KEY, password);
+        } else {
+          localStorage.setItem(SAVE_FLAG_KEY, 'false');
+          localStorage.removeItem(SAVED_PW_KEY);
+        }
+        recordLoginLog();
+      } catch { /* Storage書き込み失敗は無視 */ }
       toast.show('管理者ログインしました', 'success');
       navigate('/admin-shift');
     } catch {
@@ -52,10 +88,21 @@ export function AdminLoginPage() {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="パスワードを入力"
                 className="pl-9 bg-slate-900 border-slate-600 text-white placeholder:text-slate-500"
-                autoFocus
+                autoFocus={!password}
               />
             </div>
           </div>
+
+          <label className="flex items-center gap-2.5 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={savePassword}
+              onChange={(e) => setSavePassword(e.target.checked)}
+              className="w-4 h-4 rounded border-slate-600 text-brand-600 focus:ring-brand-500 cursor-pointer bg-slate-900"
+            />
+            <span className="text-sm text-slate-400">パスワードを保存する</span>
+          </label>
+
           <Button type="submit" size="lg" className="w-full bg-brand-600 hover:bg-brand-700" disabled={loading}>
             {loading ? 'ログイン中…' : '管理者ログイン'}
             {!loading && <ArrowRight className="w-4 h-4" />}

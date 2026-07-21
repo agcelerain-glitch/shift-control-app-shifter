@@ -1,4 +1,4 @@
-// /request シフト申請: 不可（週単位）/ 申請（テンプレA-D帯 or 時間指定）/ その他（給料受取のみ）
+// /request シフト申請: 不可（複数日指定）/ 申請（テンプレA-D帯 or 時間指定）/ その他（給料受取のみ）
 
 import { useState } from 'react';
 import { UserLayout } from '../components/UserLayout';
@@ -6,7 +6,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useData } from '../contexts/DataContext';
 import { useToast } from '../contexts/ToastContext';
 import { Card, Button, Input, Select, Badge, EmptyState } from '../components/ui';
-import { FilePlus, Ban, Clock, Wallet, CheckCircle2, AlertTriangle, Trash2 } from 'lucide-react';
+import { FilePlus, Ban, Clock, Wallet, CheckCircle2, AlertTriangle, Trash2, Plus } from 'lucide-react';
 import { formatDateJP, weekdayJP } from '../lib/utils';
 import { createShift, findShiftByMemberDate, cancelShift } from '../lib/db';
 import { PLACE_OPTIONS, SUBJECT_OPTIONS, TEMPLATE_LABELS } from '../lib/config';
@@ -23,26 +23,9 @@ for (let h = 0; h < 24; h++) {
   }
 }
 
-function getWeekRange(dateStr: string): { start: string; end: string } | null {
-  if (!dateStr) return null;
-  const d = new Date(dateStr + 'T00:00:00');
-  const day = d.getDay();
-  const diffToMon = day === 0 ? -6 : 1 - day;
-  const monDate = new Date(d);
-  monDate.setDate(d.getDate() + diffToMon);
-  const sunDate = new Date(d);
-  sunDate.setDate(d.getDate() + diffToMon + 6);
-  const fmt = (dt: Date) =>
-    `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
-  return { start: fmt(monDate), end: fmt(sunDate) };
-}
-
-function getWeekDates(weekStart: string): string[] {
-  return Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(weekStart + 'T00:00:00');
-    d.setDate(d.getDate() + i);
-    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  });
+function dayColor(d: string) {
+  const w = weekdayJP(d);
+  return w === '日' ? 'text-red-500' : w === '土' ? 'text-blue-500' : 'text-gray-500';
 }
 
 export function RequestPage() {
@@ -61,10 +44,12 @@ export function RequestPage() {
   const [canceling, setCanceling] = useState<string | null>(null);
   const [dupWarning, setDupWarning] = useState<string | null>(null);
 
+  // 不可モード: 複数日
+  const [noneDates, setNoneDates] = useState<string[]>(['']);
+
   // 件数制限なし・日付降順で全申請を表示
   const myRecent = [...shifts.filter((s) => s.memberName === name)]
     .sort((a, b) => b.date.localeCompare(a.date));
-  const weekRange = mode === 'none' ? getWeekRange(date) : null;
   const currentOption = SUBJECT_OPTIONS.find((o) => o.value === subjectMode)!;
 
   const subjectLabel = () => {
@@ -81,18 +66,27 @@ export function RequestPage() {
 
   const resolvedPlace = () => (place === '__other__' ? placeCustom.trim() : place);
 
+  const addNoneDate = () => setNoneDates((prev) => [...prev, '']);
+  const removeNoneDate = (idx: number) => setNoneDates((prev) => prev.filter((_, i) => i !== idx));
+  const updateNoneDate = (idx: number, val: string) =>
+    setNoneDates((prev) => prev.map((d, i) => (i === idx ? val : d)));
+
+  const validNoneDates = () => [...new Set(noneDates.filter((d) => d !== ''))];
+
   const handleSubmit = async () => {
     if (!name) return;
 
     if (mode === 'none') {
-      if (!weekRange) { toast.show('週を選択してください', 'error'); return; }
+      const dates = validNoneDates();
+      if (dates.length === 0) { toast.show('日付を1つ以上選択してください', 'error'); return; }
       setSubmitting(true);
       try {
-        const dates = getWeekDates(weekRange.start);
         await Promise.all(
-          dates.map((d) => createShift({ memberName: name, date: d, timeType: 'none', subject: `不可（シフトなし） ${name ?? ''}`.trim() }))
+          dates.map((d) =>
+            createShift({ memberName: name, date: d, timeType: 'none', subject: `不可（シフトなし） ${name ?? ''}`.trim() })
+          )
         );
-        toast.show(`${formatDateJP(weekRange.start)}〜${formatDateJP(weekRange.end)} を「不可」で申請しました`, 'success');
+        toast.show(`${dates.length}日分を「不可」で申請しました`, 'success');
         resetForm();
       } catch (e) { toast.show(`申請に失敗しました: ${(e as Error).message}`, 'error'); }
       finally { setSubmitting(false); }
@@ -160,11 +154,12 @@ export function RequestPage() {
 
   const resetForm = () => {
     setDate(''); setPlace(''); setPlaceCustom(''); setDupWarning(null);
+    setNoneDates(['']);
   };
 
   const modeCards: { id: Mode; label: string; desc: string; icon: typeof Ban; color: string }[] = [
     { id: 'apply', label: 'シフト申請', desc: '件名・時間を指定して申請', icon: Clock, color: 'border-brand-200 hover:border-brand-400' },
-    { id: 'none', label: '不可（シフトなし）', desc: '指定週まるごと入れません', icon: Ban, color: 'border-gray-200 hover:border-gray-400' },
+    { id: 'none', label: '不可（シフトなし）', desc: '複数日指定で入れない日を申請', icon: Ban, color: 'border-gray-200 hover:border-gray-400' },
     { id: 'other', label: 'その他（給料受取など）', desc: '出勤せず給料のみ受取', icon: Wallet, color: 'border-amber-200 hover:border-amber-400' },
   ];
 
@@ -195,18 +190,56 @@ export function RequestPage() {
       <Card className="p-5 mb-4">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 
-          {/* 不可モード */}
+          {/* 不可モード: 複数日指定 */}
           {mode === 'none' && (
-            <div className="sm:col-span-2">
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                週を選択（その週の月〜日がすべて不可になります）
-              </label>
-              <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-              {weekRange && (
-                <div className="mt-2 flex items-center gap-2 bg-red-50 text-red-700 text-sm px-3 py-2 rounded-lg">
-                  <Ban className="w-4 h-4 shrink-0" />
+            <div className="sm:col-span-2 space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="block text-sm font-medium text-gray-700">不可の日付</label>
+                <button
+                  type="button"
+                  onClick={addNoneDate}
+                  className="flex items-center gap-1 text-xs text-brand-600 hover:text-brand-700 font-medium py-1"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  日付を追加する
+                </button>
+              </div>
+
+              {noneDates.map((d, idx) => (
+                <div key={idx} className="flex items-start gap-2">
+                  <div className="flex-1">
+                    <Input
+                      type="date"
+                      value={d}
+                      onChange={(e) => updateNoneDate(idx, e.target.value)}
+                    />
+                    {d && (
+                      <p className={`text-xs mt-1 ${dayColor(d)}`}>
+                        {formatDateJP(d)}（{weekdayJP(d)}）
+                      </p>
+                    )}
+                  </div>
+                  {noneDates.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeNoneDate(idx)}
+                      className="text-gray-300 hover:text-red-500 p-2 rounded-lg hover:bg-red-50 transition-colors mt-0.5"
+                      aria-label="この日付を削除"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              ))}
+
+              {validNoneDates().length > 0 && (
+                <div className="mt-1 flex items-start gap-2 bg-red-50 text-red-700 text-sm px-3 py-2 rounded-lg">
+                  <Ban className="w-4 h-4 shrink-0 mt-0.5" />
                   <span>
-                    <strong>{formatDateJP(weekRange.start)}（月）〜{formatDateJP(weekRange.end)}（日）</strong> を不可で申請します
+                    {validNoneDates()
+                      .sort()
+                      .map((d) => `${formatDateJP(d)}（${weekdayJP(d)}）`)
+                      .join('、')} を不可で申請します
                   </span>
                 </div>
               )}
@@ -220,7 +253,7 @@ export function RequestPage() {
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">日付</label>
                 <Input type="date" value={date} onChange={(e) => checkDup(e.target.value)} />
                 {date && (
-                  <p className={`text-xs mt-1 ${weekdayJP(date) === '日' ? 'text-red-500' : weekdayJP(date) === '土' ? 'text-blue-500' : 'text-gray-500'}`}>
+                  <p className={`text-xs mt-1 ${dayColor(date)}`}>
                     {formatDateJP(date)}
                   </p>
                 )}
@@ -287,7 +320,7 @@ export function RequestPage() {
               <label className="block text-sm font-medium text-gray-700 mb-1.5">日付</label>
               <Input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
               {date && (
-                <p className={`text-xs mt-1 ${weekdayJP(date) === '日' ? 'text-red-500' : weekdayJP(date) === '土' ? 'text-blue-500' : 'text-gray-500'}`}>
+                <p className={`text-xs mt-1 ${dayColor(date)}`}>
                   {formatDateJP(date)}
                 </p>
               )}
@@ -302,7 +335,11 @@ export function RequestPage() {
             onClick={handleSubmit}
             disabled={submitting || (mode === 'apply' && !!dupWarning)}
           >
-            {submitting ? '送信中…' : mode === 'none' ? '週まとめて不可を申請' : '申請を送信'}
+            {submitting
+              ? '送信中…'
+              : mode === 'none'
+                ? `不可を申請${validNoneDates().length > 0 ? `（${validNoneDates().length}日）` : ''}`
+                : '申請を送信'}
             {!submitting && <CheckCircle2 className="w-4 h-4" />}
           </Button>
         </div>

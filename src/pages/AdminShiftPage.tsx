@@ -88,7 +88,8 @@ export function AdminShiftPage() {
         toast.show(`${s.memberName}さんのシフトを確定しました`, 'success');
         setApprovingShift(null);
       } else if (res === 'conflict') {
-        toast.show('競合: 画面を更新してください', 'error');
+        toast.show('他のadminが操作済みのため確定できませんでした。ページ更新後に再操作してください', 'error');
+        setApprovingShift(null);
       }
     } catch (e) {
       toast.show(`承認エラー: ${(e as Error).message}`, 'error');
@@ -170,7 +171,7 @@ export function AdminShiftPage() {
     try {
       const res = await approveShift({ shiftId: s.id, action: 'deny', adminName, expectedVersion: s.version });
       if (res === 'ok') toast.show(`${s.memberName}さんのシフトを確認済み（否認）にしました`, 'info');
-      else if (res === 'conflict') toast.show('競合: 画面を更新してください', 'error');
+      else if (res === 'conflict') toast.show('他のadminが操作済みのため否認できませんでした。ページ更新後に再操作してください', 'error');
     } catch (e) {
       toast.show(`否認エラー: ${(e as Error).message}`, 'error');
     }
@@ -203,17 +204,22 @@ export function AdminShiftPage() {
         adjustFields,
       });
       if (res === 'ok') { toast.show('調整して確定しました', 'success'); setAdjusting(null); }
-      else if (res === 'conflict') toast.show('競合: 画面を更新してください', 'error');
+      else if (res === 'conflict') { toast.show('他のadminが操作済みのため調整できませんでした。ページ更新後に再操作してください', 'error'); setAdjusting(null); }
     } catch (e) {
       toast.show(`調整エラー: ${(e as Error).message}`, 'error');
     }
   };
 
   const doRestore = async (log: ApprovalLog) => {
-    const res = await restoreShift(log.id);
-    if (res === 'ok') toast.show('復元しました', 'success');
-    else if (res === 'expired') toast.show('7日経過のため復元不可です', 'error');
-    else toast.show('復元に失敗しました', 'error');
+    try {
+      const res = await restoreShift(log.id);
+      if (res === 'ok') toast.show('復元しました', 'success');
+      else if (res === 'expired') toast.show('7日経過のため復元不可です', 'error');
+      else if (res === 'conflict') toast.show('シフトデータが変更されていたため復元できませんでした。最新の状態をご確認ください', 'error');
+      else toast.show('復元に失敗しました', 'error');
+    } catch (e) {
+      toast.show(`復元エラー: ${(e as Error).message}`, 'error');
+    }
   };
 
   const memberShifts = selectedMember ? shifts.filter((s) => s.memberName === selectedMember) : [];
